@@ -1,0 +1,307 @@
+import { invoke } from "@tauri-apps/api/core";
+import { ArrowUp } from "lucide-react";
+import { useState } from "react";
+import { ToolDetailView } from "@/components/tool-detail-view";
+import { TranscriptPreview } from "@/components/transcript-preview";
+import { Button } from "@/components/ui/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Textarea } from "@/components/ui/textarea";
+import { getClawdArt } from "@/lib/clawd";
+import { suggestRule } from "@/lib/rules";
+import {
+	formatRelativeTime,
+	formatTokens,
+	getActivityLabel,
+	getSessionStatus,
+	getTerminalLabel,
+	hasUsageLimit,
+	isAwaitingPermission,
+	type Session,
+	SessionStatus,
+} from "@/lib/sessions";
+import { getToolDetail } from "@/lib/tool-detail";
+import { cn } from "@/lib/utils";
+
+interface SessionRowProps {
+	session: Session;
+	index: number;
+	onShowUsage: () => void;
+}
+
+interface LimitCardProps {
+	message: string;
+	onShowUsage: () => void;
+}
+
+interface SessionCommandParams {
+	sessionId: string;
+}
+
+interface RespondSessionParams {
+	sessionId: string;
+	approve: boolean;
+}
+
+interface SendTextParams {
+	sessionId: string;
+	text: string;
+}
+
+const STATUS_TEXT_CLASSES: Record<SessionStatus, string> = {
+	[SessionStatus.Waiting]: "text-status-waiting",
+	[SessionStatus.Running]: "font-mono text-muted-foreground",
+	[SessionStatus.Idle]: "text-muted-foreground",
+};
+
+function focusSession({ sessionId }: SessionCommandParams) {
+	invoke("focus_session", { sessionId }).catch(console.error);
+}
+
+interface ReplyBoxProps {
+	sessionId: string;
+}
+
+function ReplyBox({ sessionId }: ReplyBoxProps) {
+	const [text, setText] = useState("");
+	const [error, setError] = useState("");
+	const [sending, setSending] = useState(false);
+
+	async function send({ sessionId, text }: SendTextParams) {
+		setSending(true);
+		setError("");
+		try {
+			await invoke("send_text", { sessionId, text });
+			setText("");
+		} catch (err) {
+			setError(String(err));
+		} finally {
+			setSending(false);
+		}
+	}
+
+	function submit() {
+		text.trim() && !sending && send({ sessionId, text });
+	}
+
+	return (
+		<div className="space-y-1">
+			<div className="relative">
+				<Textarea
+					value={text}
+					disabled={sending}
+					rows={2}
+					placeholder="Enviar mensagem para Claude…"
+					className="pr-10"
+					onChange={(event) => setText(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key !== "Enter" || event.shiftKey) return;
+						event.preventDefault();
+						submit();
+					}}
+				/>
+				<Button
+					size="icon-xs"
+					title="Enviar para o terminal"
+					disabled={sending || !text.trim()}
+					className="absolute right-1.5 bottom-2.5"
+					onClick={submit}
+				>
+					<ArrowUp />
+				</Button>
+			</div>
+			{error ? <p className="text-destructive text-xs">{error}</p> : null}
+		</div>
+	);
+}
+
+interface PermissionCardProps {
+	session: Session;
+	onError: (params: { message: string }) => void;
+}
+
+function PermissionCard({ session, onError }: PermissionCardProps) {
+	const detail = getToolDetail({
+		toolName: session.tool_name,
+		toolInput: session.tool_input,
+	});
+	const rule = suggestRule({
+		toolName: session.tool_name,
+		toolInput: session.tool_input,
+	});
+
+	function respond({ sessionId, approve }: RespondSessionParams) {
+		invoke("respond_session", { sessionId, approve }).catch((err) =>
+			onError({ message: String(err) }),
+		);
+	}
+
+	async function alwaysAllow() {
+		try {
+			await invoke("add_permission_rule", { cwd: session.cwd, rule });
+			respond({ sessionId: session.session_id, approve: true });
+		} catch (err) {
+			onError({ message: String(err) });
+		}
+	}
+
+	return (
+		<div className="space-y-2">
+			{detail ? (
+				<ToolDetailView detail={detail} />
+			) : (
+				<p className="truncate rounded-r-lg border-status-waiting/60 border-l-2 bg-status-waiting/10 px-2.5 py-2 font-mono text-status-waiting text-xs">
+					{session.tool}
+				</p>
+			)}
+			<div className="flex gap-2">
+				<Button
+					size="sm"
+					className="flex-1"
+					onClick={() =>
+						respond({ sessionId: session.session_id, approve: true })
+					}
+				>
+					Aprovar <span className="font-mono opacity-60">↩</span>
+				</Button>
+				<Button
+					size="sm"
+					variant="secondary"
+					className="flex-1"
+					onClick={() =>
+						respond({ sessionId: session.session_id, approve: false })
+					}
+				>
+					Negar <span className="font-mono opacity-50">esc</span>
+				</Button>
+			</div>
+			{rule && session.cwd ? (
+				<Button
+					size="xs"
+					variant="ghost-muted"
+					title={rule}
+					className="w-full"
+					onClick={alwaysAllow}
+				>
+					Sempre permitir
+				</Button>
+			) : null}
+		</div>
+	);
+}
+
+function LimitCard({ message, onShowUsage }: LimitCardProps) {
+	return (
+		<div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">
+			<p className="font-bold text-destructive text-xs">
+				Limite de uso atingido
+			</p>
+			{message ? (
+				<p className="mt-1 font-mono text-muted-foreground text-xs leading-relaxed">
+					{message}
+				</p>
+			) : null}
+			<Button size="xs" className="mt-2" onClick={onShowUsage}>
+				Ver uso do plano
+			</Button>
+		</div>
+	);
+}
+
+export function SessionRow({ session, index, onShowUsage }: SessionRowProps) {
+	const status = getSessionStatus({ session });
+	const isWaiting = status === SessionStatus.Waiting;
+	const isLimited = hasUsageLimit({ session });
+	const awaitingPermission = isAwaitingPermission({ session });
+	const [error, setError] = useState("");
+
+	const metaLine = [
+		session.cwd,
+		session.context_tokens > 0
+			? `${formatTokens({ count: session.context_tokens })} ctx`
+			: "",
+		getTerminalLabel({ session }),
+	]
+		.filter(Boolean)
+		.join(" · ");
+
+	return (
+		<Collapsible
+			className="mb-0.5 animate-row-in rounded-xl border border-transparent transition-colors has-data-panel-open:border-border has-data-panel-open:bg-card motion-reduce:animate-none"
+			style={{ animationDelay: `${index * 45}ms` }}
+		>
+			<CollapsibleTrigger className="group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-[background-color,transform] hover:bg-card active:scale-98 data-panel-open:bg-transparent">
+				<img
+					src={getClawdArt({ status })}
+					alt=""
+					className={cn(
+						"size-7 flex-none",
+						status === SessionStatus.Idle && "opacity-60",
+						isWaiting && "animate-glow motion-reduce:animate-none",
+					)}
+				/>
+				<span className="min-w-0 flex-1">
+					<span className="flex items-baseline justify-between gap-2">
+						<span className="truncate font-semibold text-foreground text-sm tracking-tight">
+							{session.project || "sem-nome"}
+						</span>
+						<span className="flex-none text-muted-foreground text-xs tabular-nums">
+							{formatRelativeTime({
+								timestamp: session.ts,
+								now: Date.now() / 1000,
+							})}
+						</span>
+					</span>
+					<span
+						className={cn(
+							"block truncate text-xs",
+							isLimited ? "text-destructive" : STATUS_TEXT_CLASSES[status],
+						)}
+					>
+						{getActivityLabel({ session })}
+					</span>
+				</span>
+			</CollapsibleTrigger>
+
+			<CollapsibleContent className="space-y-2.5 px-3 pb-3">
+				{session.message ? (
+					<p className="text-foreground/80 text-xs leading-relaxed">
+						{session.message}
+					</p>
+				) : null}
+				{isLimited ? (
+					<LimitCard
+						message={session.limit_message}
+						onShowUsage={onShowUsage}
+					/>
+				) : null}
+				{awaitingPermission ? (
+					<PermissionCard
+						session={session}
+						onError={({ message }) => setError(message)}
+					/>
+				) : null}
+				<TranscriptPreview sessionId={session.session_id} />
+				<ReplyBox sessionId={session.session_id} />
+				{error ? <p className="text-destructive text-xs">{error}</p> : null}
+				<Button
+					size="xs"
+					variant="ghost-muted"
+					className="w-full"
+					onClick={() => focusSession({ sessionId: session.session_id })}
+				>
+					Focar terminal →
+				</Button>
+				<p
+					className="truncate text-center font-mono text-muted-foreground/70 text-xs"
+					title={metaLine}
+				>
+					{metaLine}
+				</p>
+			</CollapsibleContent>
+		</Collapsible>
+	);
+}

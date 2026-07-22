@@ -1,0 +1,195 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+	/* macOS type scale: 13px body, 11px caption */
+	--text-sm: 0.8125rem;
+	--text-sm--line-height: 1.25rem;
+	--text-xs: 0.6875rem;
+	--text-xs--line-height: 0.875rem;
+	--animate-row-in: row-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+	--animate-glow: glow-pulse 2.6s ease-in-out infinite;
+	--animate-pop: pop-in 0.16s ease-out;
+
+	@keyframes row-in {
+		from {
+			opacity: 0;
+			transform: translateY(6px) scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
+	@keyframes glow-pulse {
+		0%,
+		100% {
+			filter: drop-shadow(
+				0 0 2px color-mix(in srgb, var(--status-waiting) 35%, transparent)
+			);
+		}
+		50% {
+			filter: drop-shadow(
+				0 0 7px color-mix(in srgb, var(--status-waiting) 80%, transparent)
+			);
+		}
+	}
+
+	@keyframes pop-in {
+		from {
+			opacity: 0;
+			transform: translateY(-6px) scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+}
+
+@theme inline {
+	--font-heading: var(--font-sans);
+	--font-sans:
+		-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+	--color-status-waiting: var(--status-waiting);
+	--color-status-running: var(--status-running);
+	--color-status-idle: var(--status-idle);
+	--color-sheet: var(--sheet);
+	--color-ring: var(--ring);
+	--color-input: var(--input);
+	--color-border: var(--border);
+	--color-destructive: var(--destructive);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-accent: var(--accent);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-muted: var(--muted);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-secondary: var(--secondary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-primary: var(--primary);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-popover: var(--popover);
+	--color-card-foreground: var(--card-foreground);
+	--color-card: var(--card);
+	--color-foreground: var(--foreground);
+	--color-background: var(--background);
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+	--radius-2xl: calc(var(--radius) * 1.8);
+	--radius-3xl: calc(var(--radius) * 2.2);
+	--radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Warm Claude palette, solid per the design: the window is transparent and
+   #root paints the rounded popover itself — no native vibrancy, which washed
+   the warm tones out with its gray material.
+   Theme is class-driven (.dark on <html>) so the user can override the system. */
+:root {
+	--radius: 0.8125rem;
+	--background: rgb(250 247 244);
+	--foreground: #2a2521;
+	--card: rgb(255 255 255 / 0.55);
+	--card-foreground: #2a2521;
+	--popover: rgb(250 247 244 / 0.92);
+	--popover-foreground: #2a2521;
+	--primary: #c56a45;
+	--primary-foreground: #ffffff;
+	--secondary: rgb(0 0 0 / 0.05);
+	--secondary-foreground: rgb(42 37 33 / 0.8);
+	--muted: rgb(0 0 0 / 0.05);
+	--muted-foreground: rgb(42 37 33 / 0.6);
+	--accent: rgb(0 0 0 / 0.05);
+	--accent-foreground: #2a2521;
+	--destructive: #c05a48;
+	--border: rgb(0 0 0 / 0.08);
+	--input: rgb(0 0 0 / 0.1);
+	--ring: #c56a45;
+	--status-waiting: #a9701f;
+	--status-running: #2e8f5b;
+	--status-idle: rgb(42 37 33 / 0.42);
+	--sheet: rgb(248 245 242 / 0.96);
+}
+
+.dark {
+	--background: rgb(38 33 30);
+	--foreground: rgb(255 255 255 / 0.94);
+	--card: rgb(255 255 255 / 0.045);
+	--card-foreground: rgb(255 255 255 / 0.94);
+	--popover: rgb(52 46 42 / 0.95);
+	--popover-foreground: rgb(255 255 255 / 0.94);
+	--primary: #d9805c;
+	--primary-foreground: #1a120c;
+	--secondary: rgb(255 255 255 / 0.08);
+	--secondary-foreground: rgb(255 255 255 / 0.88);
+	--muted: rgb(255 255 255 / 0.08);
+	--muted-foreground: rgb(255 255 255 / 0.55);
+	--accent: rgb(255 255 255 / 0.08);
+	--accent-foreground: rgb(255 255 255 / 0.94);
+	--destructive: #e88a7c;
+	--border: rgb(255 255 255 / 0.09);
+	--input: rgb(255 255 255 / 0.12);
+	--ring: #d9805c;
+	--status-waiting: #e7b45c;
+	--status-running: #5cc793;
+	--status-idle: rgb(255 255 255 / 0.4);
+	--sheet: rgb(30 26 24 / 0.94);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	[data-slot="collapsible-content"] {
+		height: var(--collapsible-panel-height);
+		overflow: hidden;
+		transition:
+			height 200ms cubic-bezier(0.22, 1, 0.36, 1),
+			opacity 200ms ease;
+	}
+	[data-slot="collapsible-content"][data-starting-style],
+	[data-slot="collapsible-content"][data-ending-style] {
+		height: 0;
+		opacity: 0;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		[data-slot="collapsible-content"] {
+			transition: none;
+		}
+	}
+	html {
+		@apply font-sans;
+	}
+	html,
+	body,
+	#root {
+		height: 100%;
+	}
+	body {
+		@apply cursor-default select-none overflow-hidden bg-transparent text-foreground;
+	}
+	#root {
+		@apply overflow-hidden rounded-lg border bg-background;
+	}
+	/* Minimal scrollbars on native overflow containers (sheets, transcript). */
+	::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+	::-webkit-scrollbar-track,
+	::-webkit-scrollbar-corner {
+		background: transparent;
+	}
+	::-webkit-scrollbar-thumb {
+		background: color-mix(in srgb, var(--foreground) 15%, transparent);
+		border-radius: 9999px;
+	}
+	::-webkit-scrollbar-thumb:hover {
+		background: color-mix(in srgb, var(--foreground) 25%, transparent);
+	}
+}
