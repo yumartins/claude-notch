@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::{fs, path::PathBuf, thread, time::Duration};
@@ -426,7 +427,33 @@ fn session_focus_script(session_id: &str) -> Result<String, String> {
     focus_script(term, &tty).or_else(|_| focus_script(FALLBACK_TERM_PROGRAM, &tty))
 }
 
+#[link(name = "ApplicationServices", kind = "framework")]
+extern "C" {
+    fn AXIsProcessTrusted() -> bool;
+}
+
+fn needs_accessibility(script: &str) -> bool {
+    script.contains("keystroke") || script.contains("key code")
+}
+
+/// System Events rejects keystrokes (error 1002) unless the app has the
+/// Accessibility permission. Detect it upfront, open the settings pane, and
+/// return an actionable message instead of the raw osascript error.
+fn ensure_accessibility() -> Result<(), String> {
+    let trusted = unsafe { AXIsProcessTrusted() };
+    if trusted {
+        return Ok(());
+    }
+    let _ = Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        .spawn();
+    Err("Ative o claude-notch em Ajustes → Privacidade e Segurança → Acessibilidade e tente de novo.".into())
+}
+
 fn run_osascript(script: &str) -> Result<(), String> {
+    if needs_accessibility(script) {
+        ensure_accessibility()?;
+    }
     let output = Command::new("osascript")
         .arg("-e")
         .arg(script)
@@ -703,6 +730,38 @@ async fn plan_usage(
     Ok(value)
 }
 
+/// True while the folder picker is on screen, so the popover's hide-on-blur
+/// stays off: hiding the app's only visible window deactivates an Accessory
+/// app, and macOS then dismisses the picker along with it.
+static DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
+
+/// Folder picker without a parent window: the JS dialog API always parents the
+/// NSOpenPanel to the popover as a sheet, and the popover's hide-on-blur then
+/// hides a window with an attached sheet — which crashes the app on macOS.
+#[tauri::command]
+async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    // Accessory apps are never activated by macOS on their own, so an
+    // unparented NSOpenPanel opens behind every other window. Activate first.
+    let _ = app.run_on_main_thread(|| {
+        let Some(mtm) = objc2::MainThreadMarker::new() else {
+            return;
+        };
+        #[allow(deprecated)]
+        objc2_app_kit::NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
+    });
+    DIALOG_OPEN.store(true, Ordering::SeqCst);
+    let picked = app.dialog().file().blocking_pick_folder();
+    DIALOG_OPEN.store(false, Ordering::SeqCst);
+    let path = picked
+        .and_then(|p| p.into_path().ok())
+        .map(|p| p.to_string_lossy().into_owned());
+    if path.is_some() {
+        let _ = app.get_webview_window("main").map(|w| w.hide());
+    }
+    path
+}
+
 fn toggle_popover(app: &tauri::AppHandle) {
     let Some(win) = app.get_webview_window("main") else {
         return;
@@ -774,6 +833,7 @@ pub fn run() {
             get_settings,
             set_settings,
             get_recents,
+            pick_folder,
             app_stats,
             plan_usage,
             quit
@@ -804,6 +864,9 @@ pub fn run() {
             let win_evt = window.clone();
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::Focused(false) = event {
+                    if DIALOG_OPEN.load(Ordering::SeqCst) {
+                        return;
+                    }
                     let _ = win_evt.hide();
                 }
             });
@@ -891,8 +954,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        add_rule_to_settings, aggregate_usage, applescript_escape, is_stale, parse_usage_entry,
-        vscode_app_name, AppSettings,
+        add_rule_to_settings, aggregate_usage, applescript_escape, is_stale, needs_accessibility,
+        parse_usage_entry, vscode_app_name, AppSettings,
     };
 
     #[test]
@@ -961,6 +1024,13 @@ mod tests {
         assert!(is_stale(0.0, 1_000.0, stale_secs));
         assert!(is_stale(100.0, 100.0 + 3.0 * 3_600.0, stale_secs));
         assert!(!is_stale(100.0, 100.0 + 60.0, stale_secs));
+    }
+
+    #[test]
+    fn accessibility_gate_only_covers_keystroke_scripts() {
+        assert!(needs_accessibility(r#"tell application "System Events" to keystroke "1""#));
+        assert!(needs_accessibility("tell application \"System Events\" to key code 53"));
+        assert!(!needs_accessibility(r#"tell application "Terminal" to activate"#));
     }
 
     #[test]

@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Folder, FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SheetPanel } from "@/components/sheet-panel";
@@ -29,8 +28,10 @@ export function PickerSheet({ onClose }: PickerSheetProps) {
 	}
 
 	async function pickFolder() {
-		const path = await openDialog({ directory: true }).catch(() => null);
-		if (typeof path !== "string") return;
+		const path = await invoke<string | null>("pick_folder").catch(() => null);
+		
+		if (!path) return;
+		
 		startSession({ path });
 	}
 
