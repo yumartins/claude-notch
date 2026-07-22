@@ -37,7 +37,7 @@ function formatHours({ hours }: { hours: number }): string {
 function Section({ label, hint, children }: SectionProps) {
 	return (
 		<div>
-			<p className="font-semibold text-xs">{label}</p>
+			<p className="font-semibold text-sm">{label}</p>
 			{hint ? (
 				<p className="mt-0.5 text-muted-foreground text-xs">{hint}</p>
 			) : null}
@@ -146,7 +146,7 @@ export function SettingsView({
 
 				<div className="flex items-center justify-between gap-3">
 					<div>
-						<p className="font-semibold text-xs">Notificações</p>
+						<p className="font-semibold text-sm">Notificações</p>
 						<p className="mt-0.5 text-muted-foreground text-xs">
 							Avisar quando uma sessão começa a aguardar
 						</p>
@@ -161,7 +161,7 @@ export function SettingsView({
 
 				<div className="flex items-center justify-between gap-3">
 					<div>
-						<p className="font-semibold text-xs">Ocultar inativas após</p>
+						<p className="font-semibold text-sm">Ocultar inativas após</p>
 						<p className="mt-0.5 text-muted-foreground text-xs">
 							Sessões paradas somem da lista
 						</p>

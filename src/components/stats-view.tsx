@@ -88,7 +88,7 @@ function Meter({ meter }: MeterProps) {
 	return (
 		<div>
 			<div className="flex items-baseline justify-between gap-2">
-				<span className="font-semibold text-xs">{meter.label}</span>
+				<span className="font-semibold text-sm">{meter.label}</span>
 				<span
 					className={cn(
 						"font-mono font-bold text-xs tabular-nums",
@@ -235,7 +235,7 @@ function CostTab() {
 					{summary.projects.slice(0, TOP_PROJECTS).map((project) => (
 						<div key={project.project}>
 							<div className="flex items-baseline justify-between gap-2">
-								<span className="truncate font-semibold text-xs">
+								<span className="truncate font-semibold text-sm">
 									{project.project}
 								</span>
 								<span className="flex-none font-mono font-semibold text-primary text-xs tabular-nums">

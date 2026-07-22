@@ -95,7 +95,7 @@ function ReplyBox({ sessionId }: ReplyBoxProps) {
 					disabled={sending}
 					rows={2}
 					placeholder="Enviar mensagem para Claude…"
-					className="pr-10"
+					className="min-h-24 pr-11"
 					onChange={(event) => setText(event.target.value)}
 					onKeyDown={(event) => {
 						if (event.key !== "Enter" || event.shiftKey) return;
@@ -104,10 +104,10 @@ function ReplyBox({ sessionId }: ReplyBoxProps) {
 					}}
 				/>
 				<Button
-					size="icon-xs"
+					size="icon-sm"
 					title="Enviar para o terminal"
 					disabled={sending || !text.trim()}
-					className="absolute right-1.5 bottom-2.5"
+					className="absolute right-2 bottom-2.5"
 					onClick={submit}
 				>
 					<ArrowUp />
@@ -153,14 +153,13 @@ function PermissionCard({ session, onError }: PermissionCardProps) {
 			{detail ? (
 				<ToolDetailView detail={detail} />
 			) : (
-				<p className="truncate rounded-r-lg border-status-waiting/60 border-l-2 bg-status-waiting/10 px-2.5 py-2 font-mono text-status-waiting text-xs">
+				<p className="truncate rounded-r-lg border-status-waiting/60 border-l-2 bg-status-waiting/10 px-2.5 py-2 font-mono text-sm text-status-waiting">
 					{session.tool}
 				</p>
 			)}
 			<div className="flex gap-2">
 				<Button
-					size="sm"
-					className="flex-1"
+					className="flex-1 rounded-md font-semibold"
 					onClick={() =>
 						respond({ sessionId: session.session_id, approve: true })
 					}
@@ -168,9 +167,8 @@ function PermissionCard({ session, onError }: PermissionCardProps) {
 					Aprovar <span className="font-mono opacity-60">↩</span>
 				</Button>
 				<Button
-					size="sm"
 					variant="secondary"
-					className="flex-1"
+					className="flex-1 rounded-md font-semibold"
 					onClick={() =>
 						respond({ sessionId: session.session_id, approve: false })
 					}
@@ -195,8 +193,8 @@ function PermissionCard({ session, onError }: PermissionCardProps) {
 
 function LimitCard({ message, onShowUsage }: LimitCardProps) {
 	return (
-		<div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">
-			<p className="font-bold text-destructive text-xs">
+		<div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5">
+			<p className="font-bold text-destructive text-sm">
 				Limite de uso atingido
 			</p>
 			{message ? (
@@ -204,7 +202,7 @@ function LimitCard({ message, onShowUsage }: LimitCardProps) {
 					{message}
 				</p>
 			) : null}
-			<Button size="xs" className="mt-2" onClick={onShowUsage}>
+			<Button size="sm" className="mt-2 font-semibold" onClick={onShowUsage}>
 				Ver uso do plano
 			</Button>
 		</div>
@@ -230,10 +228,10 @@ export function SessionRow({ session, index, onShowUsage }: SessionRowProps) {
 
 	return (
 		<Collapsible
-			className="mb-0.5 animate-row-in rounded-xl border border-transparent transition-colors has-data-panel-open:border-border has-data-panel-open:bg-card motion-reduce:animate-none"
+			className="mb-0.5 animate-row-in rounded-lg border border-transparent transition-colors has-data-panel-open:border-border has-data-panel-open:bg-card motion-reduce:animate-none"
 			style={{ animationDelay: `${index * 45}ms` }}
 		>
-			<CollapsibleTrigger className="group flex w-full items-center gap-3 rounded-xl p-3 text-left transition-[background-color,transform] hover:bg-card active:scale-98 data-panel-open:bg-transparent">
+			<CollapsibleTrigger className="group flex w-full items-center gap-3 rounded-lg p-3 text-left transition-[background-color,transform] hover:bg-card active:scale-98 data-panel-open:bg-transparent">
 				<img
 					src={getClawdArt({ status })}
 					alt=""
@@ -245,7 +243,7 @@ export function SessionRow({ session, index, onShowUsage }: SessionRowProps) {
 				/>
 				<span className="min-w-0 flex-1">
 					<span className="flex items-baseline justify-between gap-2">
-						<span className="truncate font-semibold text-foreground text-sm tracking-tight">
+						<span className="truncate font-semibold text-base text-foreground tracking-tight">
 							{session.project || "sem-nome"}
 						</span>
 						<span className="flex-none text-muted-foreground text-xs tabular-nums">
@@ -257,7 +255,7 @@ export function SessionRow({ session, index, onShowUsage }: SessionRowProps) {
 					</span>
 					<span
 						className={cn(
-							"block truncate text-xs",
+							"block truncate text-sm",
 							isLimited ? "text-destructive" : STATUS_TEXT_CLASSES[status],
 						)}
 					>
@@ -268,7 +266,7 @@ export function SessionRow({ session, index, onShowUsage }: SessionRowProps) {
 
 			<CollapsibleContent className="space-y-2.5 px-3 pb-3">
 				{session.message ? (
-					<p className="text-foreground/80 text-xs leading-relaxed">
+					<p className="text-muted-foreground text-sm leading-relaxed">
 						{session.message}
 					</p>
 				) : null}
@@ -288,7 +286,7 @@ export function SessionRow({ session, index, onShowUsage }: SessionRowProps) {
 				<ReplyBox sessionId={session.session_id} />
 				{error ? <p className="text-destructive text-xs">{error}</p> : null}
 				<Button
-					size="xs"
+					size="sm"
 					variant="ghost-muted"
 					className="w-full"
 					onClick={() => focusSession({ sessionId: session.session_id })}

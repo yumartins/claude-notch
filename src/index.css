@@ -5,7 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-	/* macOS type scale: 13px body, 11px caption */
+	/* macOS type scale per design: 14px emphasis, 13px body, 11px caption */
+	--text-base: 0.875rem;
+	--text-base--line-height: 1.25rem;
 	--text-sm: 0.8125rem;
 	--text-sm--line-height: 1.25rem;
 	--text-xs: 0.6875rem;
@@ -174,7 +176,9 @@
 		@apply cursor-default select-none overflow-hidden bg-transparent text-foreground;
 	}
 	#root {
-		@apply overflow-hidden rounded-lg border bg-background;
+		@apply overflow-hidden border bg-background;
+		/* Popover radius per the design (16px) sits between the radius tokens. */
+		border-radius: 1rem;
 	}
 	/* Minimal scrollbars on native overflow containers (sheets, transcript). */
 	::-webkit-scrollbar {

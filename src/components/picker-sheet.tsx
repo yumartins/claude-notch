@@ -29,9 +29,9 @@ export function PickerSheet({ onClose }: PickerSheetProps) {
 
 	async function pickFolder() {
 		const path = await invoke<string | null>("pick_folder").catch(() => null);
-		
+
 		if (!path) return;
-		
+
 		startSession({ path });
 	}
 
@@ -50,7 +50,7 @@ export function PickerSheet({ onClose }: PickerSheetProps) {
 							onClick={() => startSession({ path })}
 						>
 							<Folder className="size-3.5 flex-none text-primary/60" />
-							<span className="truncate font-mono text-foreground text-xs">
+							<span className="truncate font-mono text-foreground text-sm">
 								{path}
 							</span>
 						</Button>
@@ -61,7 +61,7 @@ export function PickerSheet({ onClose }: PickerSheetProps) {
 						onClick={pickFolder}
 					>
 						<FolderOpen className="size-3.5 flex-none text-muted-foreground" />
-						<span className="text-muted-foreground text-xs">
+						<span className="text-muted-foreground text-sm">
 							Escolher pasta…
 						</span>
 					</Button>
