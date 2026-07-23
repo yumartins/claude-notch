@@ -2,7 +2,7 @@ mod integrations;
 mod permissions;
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -212,6 +212,23 @@ fn read_sessions(stale_secs: f64) -> Vec<Session> {
     sessions_from_dir(status_dir(), stale_secs, now, &mut out);
     sessions_from_dir(notch_status_dir(), stale_secs, now, &mut out);
     out
+}
+
+/// Newest event timestamp per provider across every status file, ignoring the
+/// stale filter, so the UI can tell an installed-but-silent integration (agent
+/// never restarted) from one that is actually firing hooks.
+fn newest_event_by_provider(sessions: &[Session]) -> HashMap<String, f64> {
+    let mut out: HashMap<String, f64> = HashMap::new();
+    for session in sessions {
+        let slot = out.entry(session.provider.clone()).or_insert(0.0);
+        *slot = slot.max(session.ts);
+    }
+    out
+}
+
+#[tauri::command]
+fn integration_events() -> HashMap<String, f64> {
+    newest_event_by_provider(&read_sessions(f64::INFINITY))
 }
 
 fn read_session_file(session_id: &str) -> Option<serde_json::Value> {
@@ -931,6 +948,7 @@ pub fn run() {
             integrations::install_integration,
             integrations::uninstall_integration,
             integrations::integration_status,
+            integration_events,
             quit
         ])
         .setup(|app| {
@@ -1052,7 +1070,8 @@ pub fn run() {
 mod tests {
     use super::{
         add_cursor_rule, add_rule_to_settings, aggregate_usage, applescript_escape, is_stale,
-        needs_accessibility, parse_usage_entry, session_from_value, vscode_app_name, AppSettings,
+        needs_accessibility, newest_event_by_provider, parse_usage_entry, session_from_value,
+        vscode_app_name, AppSettings,
     };
 
     #[test]
@@ -1086,6 +1105,25 @@ mod tests {
             root,
             serde_json::json!({"permissions": {"allow": ["Bash(bun test:*)"]}})
         );
+    }
+
+    #[test]
+    fn newest_event_keeps_the_latest_ts_per_provider() {
+        let mk = |id: &str, provider: &str, ts: f64| {
+            session_from_value(
+                id.to_string(),
+                &serde_json::json!({"provider": provider, "ts": ts}),
+            )
+        };
+        let sessions = vec![
+            mk("a", "claude", 100.0),
+            mk("b", "claude", 250.0),
+            mk("c", "cursor", 180.0),
+        ];
+        let events = newest_event_by_provider(&sessions);
+        assert_eq!(events.get("claude"), Some(&250.0));
+        assert_eq!(events.get("cursor"), Some(&180.0));
+        assert_eq!(events.get("codex"), None);
     }
 
     #[test]
