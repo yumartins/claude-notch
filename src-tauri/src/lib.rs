@@ -563,22 +563,51 @@ fn add_rule_to_settings(root: &mut serde_json::Value, rule: &str) -> bool {
     true
 }
 
-/// "Always allow": appends the rule to the project's .claude/settings.local.json,
-/// the file Claude Code uses for the user's per-project permission grants.
-#[tauri::command]
-fn add_permission_rule(cwd: String, rule: String) -> Result<(), String> {
-    if cwd.is_empty() || rule.is_empty() {
-        return Err("projeto ou regra ausente".into());
-    }
-    let dir = PathBuf::from(&cwd).join(".claude");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join("settings.local.json");
-    let mut root: serde_json::Value = fs::read_to_string(&path)
+fn read_json_object(path: &PathBuf) -> serde_json::Value {
+    fs::read_to_string(path)
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
         .filter(serde_json::Value::is_object)
-        .unwrap_or_else(|| serde_json::json!({}));
-    add_rule_to_settings(&mut root, &rule);
+        .unwrap_or_else(|| serde_json::json!({}))
+}
+
+/// Appends the rule under its cwd in the app's own allowlist. Cursor's hook
+/// reads this file to self-approve matching commands, since Cursor has no
+/// native permission-rule mechanism of its own.
+fn add_cursor_rule(root: &mut serde_json::Value, cwd: &str, rule: &str) -> bool {
+    let allow = root
+        .as_object_mut()
+        .map(|r| r.entry(cwd).or_insert_with(|| serde_json::json!([])))
+        .and_then(|a| a.as_array_mut());
+    let Some(allow) = allow else {
+        return false;
+    };
+    if allow.iter().any(|r| r.as_str() == Some(rule)) {
+        return false;
+    }
+    allow.push(serde_json::Value::String(rule.to_string()));
+    true
+}
+
+/// "Always allow". Claude rules go to the project's .claude/settings.local.json
+/// (Claude Code enforces them natively); Cursor rules go to the app's own
+/// allowlist, which the Cursor hook consults before prompting.
+#[tauri::command]
+fn add_permission_rule(cwd: String, rule: String, provider: String) -> Result<(), String> {
+    if cwd.is_empty() || rule.is_empty() {
+        return Err("projeto ou regra ausente".into());
+    }
+    let path = match provider.as_str() {
+        "cursor" => notch_dir().join("rules.json"),
+        _ => PathBuf::from(&cwd).join(".claude").join("settings.local.json"),
+    };
+    let parent = path.parent().ok_or("invalid rule path")?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let mut root = read_json_object(&path);
+    match provider.as_str() {
+        "cursor" => add_cursor_rule(&mut root, &cwd, &rule),
+        _ => add_rule_to_settings(&mut root, &rule),
+    };
     let text = serde_json::to_string_pretty(&root).map_err(|e| e.to_string())?;
     fs::write(path, text).map_err(|e| e.to_string())
 }
@@ -1022,8 +1051,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        add_rule_to_settings, aggregate_usage, applescript_escape, is_stale, needs_accessibility,
-        parse_usage_entry, session_from_value, vscode_app_name, AppSettings,
+        add_cursor_rule, add_rule_to_settings, aggregate_usage, applescript_escape, is_stale,
+        needs_accessibility, parse_usage_entry, session_from_value, vscode_app_name, AppSettings,
     };
 
     #[test]
@@ -1056,6 +1085,21 @@ mod tests {
         assert_eq!(
             root,
             serde_json::json!({"permissions": {"allow": ["Bash(bun test:*)"]}})
+        );
+    }
+
+    #[test]
+    fn cursor_rules_are_grouped_by_cwd_and_deduped() {
+        let mut root = serde_json::json!({});
+        assert!(add_cursor_rule(&mut root, "/tmp/demo", "Shell(git push:*)"));
+        assert!(!add_cursor_rule(&mut root, "/tmp/demo", "Shell(git push:*)"));
+        assert!(add_cursor_rule(&mut root, "/tmp/other", "browser_navigate"));
+        assert_eq!(
+            root,
+            serde_json::json!({
+                "/tmp/demo": ["Shell(git push:*)"],
+                "/tmp/other": ["browser_navigate"],
+            })
         );
     }
 

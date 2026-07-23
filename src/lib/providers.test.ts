@@ -64,15 +64,15 @@ describe("getProviderLabel", () => {
 });
 
 describe("capability gating", () => {
-	test("transcript preview is claude-only", () => {
+	test("transcript preview works for providers that emit a transcript", () => {
 		expect(
 			supportsTranscript({ session: makeSession({ provider: "claude" }) }),
 		).toBe(true);
 		expect(
-			supportsTranscript({ session: makeSession({ provider: "codex" }) }),
-		).toBe(false);
-		expect(
 			supportsTranscript({ session: makeSession({ provider: "cursor" }) }),
+		).toBe(true);
+		expect(
+			supportsTranscript({ session: makeSession({ provider: "codex" }) }),
 		).toBe(false);
 	});
 
@@ -88,11 +88,14 @@ describe("capability gating", () => {
 		).toBe(false);
 	});
 
-	test("permission rules are claude-only", () => {
+	test("permission rules work for claude and cursor, not codex", () => {
 		expect(
 			supportsPermissionRules({
 				session: makeSession({ provider: "claude" }),
 			}),
+		).toBe(true);
+		expect(
+			supportsPermissionRules({ session: makeSession({ provider: "cursor" }) }),
 		).toBe(true);
 		expect(
 			supportsPermissionRules({ session: makeSession({ provider: "codex" }) }),

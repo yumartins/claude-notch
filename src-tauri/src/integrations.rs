@@ -47,10 +47,12 @@ const CODEX_ENTRIES: [HookEntry; 5] = [
     HookEntry { event: "Stop", matcher: None, script: "codex-status.py", args: "", timeout: None },
 ];
 
-const CURSOR_EVENTS: [&str; 5] = [
+const CURSOR_EVENTS: [&str; 7] = [
     "beforeSubmitPrompt",
+    "afterAgentResponse",
     "afterFileEdit",
     "stop",
+    "sessionEnd",
     "beforeShellExecution",
     "beforeMCPExecution",
 ];
@@ -97,7 +99,7 @@ fn claude_style_entry(entry: &HookEntry, hooks_dir: &str) -> Value {
 }
 
 /// Inserts (or refreshes) our hook entries, leaving user entries untouched.
-pub fn apply_claude_style_hooks(root: &mut Value, entries: &[HookEntry], hooks_dir: &str) {
+fn apply_claude_style_hooks(root: &mut Value, entries: &[HookEntry], hooks_dir: &str) {
     for entry in entries {
         let Some(array) = ensure_event_array(root, entry.event) else {
             continue;
@@ -107,7 +109,7 @@ pub fn apply_claude_style_hooks(root: &mut Value, entries: &[HookEntry], hooks_d
     }
 }
 
-pub fn apply_cursor_hooks(root: &mut Value, hooks_dir: &str) {
+fn apply_cursor_hooks(root: &mut Value, hooks_dir: &str) {
     if let Some(base) = root.as_object_mut() {
         base.entry("version").or_insert(json!(1));
     }

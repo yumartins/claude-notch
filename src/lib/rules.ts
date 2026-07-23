@@ -5,20 +5,21 @@ interface SuggestRuleParams {
 	toolInput: ToolInput;
 }
 
-/// Claude Code permission rule for "always allow": two leading tokens cover
-/// the common `<binary> <subcommand>` shape without allowing everything.
+/// "Always allow" permission rule: any command-carrying tool (Claude's `Bash`,
+/// Cursor's `Shell`) is scoped to its two leading tokens — the common
+/// `<binary> <subcommand>` shape — so the grant covers reruns without allowing
+/// everything. Tools without a command become a bare tool rule.
 export function suggestRule({
 	toolName,
 	toolInput,
 }: SuggestRuleParams): string | null {
 	if (!toolName) return null;
-	if (toolName !== "Bash") return toolName;
 
 	const command = String(toolInput?.command ?? "").trim();
 	if (!command) return toolName;
 
 	const tokens = command.split(/\s+/);
 	return tokens.length === 1
-		? `Bash(${command})`
-		: `Bash(${tokens.slice(0, 2).join(" ")}:*)`;
+		? `${toolName}(${command})`
+		: `${toolName}(${tokens.slice(0, 2).join(" ")}:*)`;
 }
