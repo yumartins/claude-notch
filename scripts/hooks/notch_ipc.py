@@ -7,8 +7,10 @@ Deployed alongside the hook scripts in ~/.claude-notch/hooks so they can import
 it with a plain `import notch_ipc`.
 """
 import json
+import os
 import pathlib
 import socket
+import tempfile
 
 CONNECT_TIMEOUT = 0.25
 
@@ -25,8 +27,21 @@ def read_status(status_file):
 
 
 def write_status(status_file, payload):
+    """Atomic write: agents fire status hooks in rapid bursts (PreToolUse,
+    PostToolUse, Stop), so two processes race on the same file. A plain write
+    interleaves them into corrupt JSON; a temp file + os.replace makes every
+    reader see one complete version or the other, never a torn one."""
     status_file.parent.mkdir(parents=True, exist_ok=True)
-    status_file.write_text(json.dumps(payload))
+    fd, tmp = tempfile.mkstemp(dir=str(status_file.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps(payload))
+        os.replace(tmp, status_file)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
 
 def request_decision(request, response_timeout):

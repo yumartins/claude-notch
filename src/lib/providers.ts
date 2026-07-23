@@ -18,14 +18,22 @@ export const PROVIDER_LABELS: Record<Provider, string> = {
 
 const KNOWN_PROVIDERS = new Set<string>(Object.values(Provider));
 
-// Transcript parsing and terminal keystrokes are Claude-format/TUI specific;
-// Codex still runs in a terminal, Cursor lives inside the editor.
-const TRANSCRIPT_PROVIDERS = new Set<Provider>([Provider.Claude]);
+// Claude and Cursor emit a Claude-format transcript (Cursor's hook synthesizes
+// one from its prompt/response events); Codex does not.
+const TRANSCRIPT_PROVIDERS = new Set<Provider>([
+	Provider.Claude,
+	Provider.Cursor,
+]);
 const TERMINAL_REPLY_PROVIDERS = new Set<Provider>([
 	Provider.Claude,
 	Provider.Codex,
 ]);
-const PERMISSION_RULE_PROVIDERS = new Set<Provider>([Provider.Claude]);
+// Claude enforces its rules natively; Cursor's hook reads the rules the app
+// writes and self-approves before prompting. Codex has no rule mechanism.
+const PERMISSION_RULE_PROVIDERS = new Set<Provider>([
+	Provider.Claude,
+	Provider.Cursor,
+]);
 
 export function getProvider({ session }: SessionParams): Provider {
 	return KNOWN_PROVIDERS.has(session.provider)

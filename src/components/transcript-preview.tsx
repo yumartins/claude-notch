@@ -1,19 +1,23 @@
 import { useEffect, useRef } from "react";
+import { Markdown } from "@/components/markdown";
 import { useTranscript } from "@/hooks/use-transcript";
 import { TranscriptRole } from "@/lib/transcript";
 import { cn } from "@/lib/utils";
 
 interface TranscriptPreviewProps {
 	sessionId: string;
+	assistantLabel: string;
 }
 
-const ROLE_LABELS: Record<TranscriptRole, string> = {
-	[TranscriptRole.User]: "You",
-	[TranscriptRole.Assistant]: "Claude",
-};
-
-export function TranscriptPreview({ sessionId }: TranscriptPreviewProps) {
+export function TranscriptPreview({
+	sessionId,
+	assistantLabel,
+}: TranscriptPreviewProps) {
 	const items = useTranscript({ sessionId });
+	const roleLabels: Record<TranscriptRole, string> = {
+		[TranscriptRole.User]: "You",
+		[TranscriptRole.Assistant]: assistantLabel,
+	};
 	const scrollRef = useRef<HTMLDivElement>(null);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll follows new items
@@ -27,7 +31,7 @@ export function TranscriptPreview({ sessionId }: TranscriptPreviewProps) {
 	return (
 		<div
 			ref={scrollRef}
-			className="max-h-36 space-y-1.5 overflow-y-auto rounded-md border bg-muted/50 px-2 py-1.5"
+			className="max-h-36 space-y-2 overflow-y-auto rounded-md border bg-muted/50 p-2.5"
 		>
 			{items.map((item, index) => (
 				// biome-ignore lint/suspicious/noArrayIndexKey: stateless tail view, items shift as transcript grows
@@ -40,9 +44,9 @@ export function TranscriptPreview({ sessionId }: TranscriptPreviewProps) {
 								: "text-muted-foreground",
 						)}
 					>
-						{ROLE_LABELS[item.role]}
+						{roleLabels[item.role]}
 					</span>{" "}
-					<span className="text-foreground/80">{item.text}</span>
+					<Markdown className="inline text-foreground/80">{item.text}</Markdown>
 					{item.tools.map((tool) => (
 						<span
 							key={tool}

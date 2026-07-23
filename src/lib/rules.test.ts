@@ -17,6 +17,15 @@ describe("suggestRule", () => {
 		).toBe("Bash(ls)");
 	});
 
+	test("cursor shell commands scope by the same two-token prefix", () => {
+		expect(
+			suggestRule({
+				toolName: "Shell",
+				toolInput: { command: "git push origin main" },
+			}),
+		).toBe("Shell(git push:*)");
+	});
+
 	test("other tools become a bare tool rule", () => {
 		expect(suggestRule({ toolName: "Edit", toolInput: {} })).toBe("Edit");
 		expect(suggestRule({ toolName: "WebFetch", toolInput: {} })).toBe(

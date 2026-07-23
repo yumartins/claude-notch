@@ -14,6 +14,9 @@ import pathlib
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import notch_ipc
+
 TAIL_BYTES = 131072
 MESSAGE_LIMIT = 280
 
@@ -166,7 +169,7 @@ transcript_path = data.get("transcript_path", "") or previous.get("transcript_pa
 last_message, context_tokens, limit_message = last_assistant_info(transcript_path)
 compute_totals = status in ("waiting", "idle")
 
-status_file.write_text(json.dumps({
+notch_ipc.write_status(status_file, {
     "status": status,
     "provider": "claude",
     "started_at": previous.get("started_at") or time.time(),
@@ -187,4 +190,4 @@ status_file.write_text(json.dumps({
     "context_tokens": context_tokens or previous.get("context_tokens", 0),
     "output_tokens": total_output_tokens(transcript_path) if compute_totals else previous.get("output_tokens", 0),
     "ts": time.time(),
-}))
+})

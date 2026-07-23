@@ -79,6 +79,54 @@ function startFakeApp({ home, decision, onRequest }: FakeAppParams) {
 }
 
 describe("claude-status.py", () => {
+	test("concurrent status writes never corrupt the file", async () => {
+		const home = makeHome();
+		const target = join(home, "race.json");
+
+		// Threads overlap at the write() syscall, unlike separate processes whose
+		// startup cost hides the race. A truncating write of a short payload while
+		// a longer one is mid-flight used to leave the long tail behind -> torn
+		// JSON. Alternating payload sizes maximizes that window.
+		// The app's real failure is the poller reading the file while a hook
+		// rewrites it. A plain truncating write exposes an empty/partial window;
+		// an atomic temp+rename never does. Reader threads assert every read
+		// parses; a torn read is the regression.
+		const stress = `
+import sys, json, pathlib, threading
+sys.path.insert(0, ${JSON.stringify(import.meta.dir)})
+import notch_ipc
+target = pathlib.Path(${JSON.stringify(target)})
+notch_ipc.write_status(target, {"status": "idle"})
+big = {"status": "running", "pad": "A" * 6000}
+small = {"status": "idle"}
+torn = []
+def writer(payload):
+    for _ in range(400):
+        notch_ipc.write_status(target, payload)
+def reader():
+    for _ in range(1500):
+        try:
+            json.loads(target.read_text())
+        except Exception as e:
+            torn.append(str(e))
+            return
+writers = [threading.Thread(target=writer, args=(big if i % 2 else small,)) for i in range(6)]
+readers = [threading.Thread(target=reader) for _ in range(4)]
+for t in writers + readers: t.start()
+for t in writers + readers: t.join()
+if torn:
+    print("TORN:", torn[0]); sys.exit(1)
+print("ok")
+`;
+		const proc = Bun.spawn({
+			cmd: ["python3", "-c", stress],
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const exitCode = await proc.exited;
+		expect(exitCode).toBe(0);
+	});
+
 	test("stamps provider and preserves started_at across writes", async () => {
 		const home = makeHome();
 		const payload = { session_id: "s1", cwd: "/tmp/demo" };
@@ -195,6 +243,48 @@ describe("cursor-hook.py", () => {
 		expect(stopped.type).toBe("idle_prompt");
 	});
 
+	test("builds a claude-format transcript from prompts and responses", async () => {
+		const home = makeHome();
+
+		await runHook({
+			script: "cursor-hook.py",
+			payload: {
+				...base,
+				hook_event_name: "beforeSubmitPrompt",
+				prompt: "fix the bug",
+			},
+			home,
+		});
+		await runHook({
+			script: "cursor-hook.py",
+			payload: {
+				...base,
+				hook_event_name: "afterAgentResponse",
+				text: "Done, the bug is fixed.",
+			},
+			home,
+		});
+
+		const status = await readStatus({ home, file });
+		expect(status.last_message).toBe("Done, the bug is fixed.");
+		expect(status.transcript_path).toBe(
+			join(home, ".claude-notch/transcripts/cursor-v1.jsonl"),
+		);
+
+		const transcript = await Bun.file(
+			status.transcript_path as string,
+		).text();
+		const lines = transcript.trim().split("\n").map((l) => JSON.parse(l));
+		expect(lines[0]).toEqual({
+			type: "user",
+			message: { content: "fix the bug" },
+		});
+		expect(lines[1]).toEqual({
+			type: "assistant",
+			message: { content: [{ type: "text", text: "Done, the bug is fixed." }] },
+		});
+	});
+
 	test("shell gating forwards the app decision", async () => {
 		const home = makeHome();
 		let seen: Record<string, unknown> = {};
@@ -274,6 +364,60 @@ describe("cursor-hook.py", () => {
 		const status = await readStatus({ home, file });
 		expect(status.status).toBe("running");
 		expect(status.tool).toBe("Shell · git status");
+	});
+
+	test("sessionEnd drops the status file and transcript", async () => {
+		const home = makeHome();
+
+		await runHook({
+			script: "cursor-hook.py",
+			payload: {
+				...base,
+				hook_event_name: "beforeSubmitPrompt",
+				prompt: "hi",
+			},
+			home,
+		});
+		expect(await Bun.file(join(home, file)).exists()).toBe(true);
+
+		// sessionEnd keys the conversation as session_id, not conversation_id.
+		await runHook({
+			script: "cursor-hook.py",
+			payload: {
+				hook_event_name: "sessionEnd",
+				session_id: "v1",
+				reason: "user_close",
+			},
+			home,
+		});
+
+		expect(await Bun.file(join(home, file)).exists()).toBe(false);
+		expect(
+			await Bun.file(
+				join(home, ".claude-notch/transcripts/cursor-v1.jsonl"),
+			).exists(),
+		).toBe(false);
+	});
+
+	test("pre-approved commands self-allow without the app", async () => {
+		const home = makeHome();
+		await Bun.write(
+			join(home, ".claude-notch/rules.json"),
+			JSON.stringify({ "/tmp/demo": ["Shell(git push:*)"] }),
+		);
+
+		const result = await runHook({
+			script: "cursor-hook.py",
+			payload: {
+				...base,
+				hook_event_name: "beforeShellExecution",
+				command: "git push origin main",
+			},
+			home,
+		});
+
+		expect(JSON.parse(result.stdout)).toEqual({ permission: "allow" });
+		expect((await readStatus({ home, file })).status).toBe("running");
 	});
 });
 

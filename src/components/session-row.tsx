@@ -156,7 +156,11 @@ function PermissionCard({ session, onError }: PermissionCardProps) {
 
 	async function alwaysAllow() {
 		try {
-			await invoke("add_permission_rule", { cwd: session.cwd, rule });
+			await invoke("add_permission_rule", {
+				cwd: session.cwd,
+				rule,
+				provider: getProvider({ session }),
+			});
 			respond({ sessionId: session.session_id, approve: true });
 		} catch (err) {
 			onError({ message: String(err) });
@@ -247,7 +251,11 @@ function SocketPermissionCard({
 
 	async function alwaysAllow() {
 		try {
-			await invoke("add_permission_rule", { cwd: request.cwd, rule });
+			await invoke("add_permission_rule", {
+				cwd: request.cwd,
+				rule,
+				provider: getProvider({ session }),
+			});
 			resolve({ decision: PermissionDecision.Allow });
 		} catch (err) {
 			onError({ message: String(err) });
@@ -279,7 +287,7 @@ function SocketPermissionCard({
 				</Button>
 			</div>
 			<Button
-				size="xs"
+				size="sm"
 				variant="ghost-muted"
 				className="w-full"
 				onClick={() => resolve({ decision: PermissionDecision.Passthrough })}
@@ -288,7 +296,7 @@ function SocketPermissionCard({
 			</Button>
 			{supportsPermissionRules({ session }) && rule && request.cwd ? (
 				<Button
-					size="xs"
+					size="sm"
 					variant="ghost-muted"
 					title={rule}
 					className="w-full"
@@ -393,7 +401,7 @@ export function SessionRow({
 				</span>
 			</CollapsibleTrigger>
 
-			<CollapsibleContent className="space-y-2.5 px-3 pb-3">
+			<CollapsibleContent className="space-y-2 px-3 pb-3">
 				{session.message ? (
 					<p className="text-muted-foreground text-sm leading-relaxed">
 						{session.message}
@@ -419,7 +427,10 @@ export function SessionRow({
 					/>
 				) : null}
 				{supportsTranscript({ session }) ? (
-					<TranscriptPreview sessionId={session.session_id} />
+					<TranscriptPreview
+						sessionId={session.session_id}
+						assistantLabel={getProviderLabel({ session })}
+					/>
 				) : null}
 				{supportsTerminalReply({ session }) ? (
 					<ReplyBox sessionId={session.session_id} />
