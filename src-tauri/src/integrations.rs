@@ -11,11 +11,12 @@ use std::{fs, io};
 /// uninstall can strip exactly our entries and nothing else.
 pub const MARKER: &str = ".claude-notch/hooks/";
 
-const HOOK_SCRIPTS: [(&str, &str); 5] = [
+const HOOK_SCRIPTS: [(&str, &str); 6] = [
     ("notch_ipc.py", include_str!("../../scripts/hooks/notch_ipc.py")),
     ("claude-status.py", include_str!("../../scripts/hooks/claude-status.py")),
     ("claude-permission.py", include_str!("../../scripts/hooks/claude-permission.py")),
     ("codex-status.py", include_str!("../../scripts/hooks/codex-status.py")),
+    ("codex-permission.py", include_str!("../../scripts/hooks/codex-permission.py")),
     ("cursor-hook.py", include_str!("../../scripts/hooks/cursor-hook.py")),
 ];
 
@@ -39,7 +40,8 @@ const CLAUDE_ENTRIES: [HookEntry; 7] = [
     HookEntry { event: "SessionEnd", matcher: None, script: "claude-status.py", args: "end", timeout: None },
 ];
 
-const CODEX_ENTRIES: [HookEntry; 5] = [
+const CODEX_ENTRIES: [HookEntry; 6] = [
+    HookEntry { event: "PermissionRequest", matcher: None, script: "codex-permission.py", args: "", timeout: Some(600) },
     HookEntry { event: "SessionStart", matcher: None, script: "codex-status.py", args: "", timeout: None },
     HookEntry { event: "UserPromptSubmit", matcher: None, script: "codex-status.py", args: "", timeout: None },
     HookEntry { event: "PreToolUse", matcher: None, script: "codex-status.py", args: "", timeout: None },

@@ -46,6 +46,8 @@ struct Session {
     context_tokens: u64,
     output_tokens: u64,
     ts: f64,
+    /// Set by the poll loop from the snooze map; never read from disk.
+    snoozed: bool,
 }
 
 #[derive(Serialize)]
@@ -173,7 +175,39 @@ fn session_from_value(session_id: String, v: &serde_json::Value) -> Session {
         context_tokens: get_u64("context_tokens"),
         output_tokens: get_u64("output_tokens"),
         ts: get_f64("ts"),
+        snoozed: false,
     }
+}
+
+/// Waiting for the user and not snoozed — what the tray badge and idle
+/// notifications count.
+fn is_active_waiting(session: &Session) -> bool {
+    session.status == "waiting" && !session.snoozed
+}
+
+#[derive(Default)]
+struct Snoozed(Mutex<HashMap<String, f64>>);
+
+/// Flags snoozed sessions and prunes the map: an entry survives only while its
+/// session still exists and hasn't advanced past the snoozed ts, so any new
+/// activity (a fresh event bumps ts) or an ended session auto-unsnoozes.
+fn apply_snooze(sessions: &mut [Session], snoozed: &mut HashMap<String, f64>) {
+    let current: HashMap<&str, f64> =
+        sessions.iter().map(|s| (s.session_id.as_str(), s.ts)).collect();
+    snoozed.retain(|id, &mut at| current.get(id.as_str()).is_some_and(|&ts| ts <= at));
+    for session in sessions.iter_mut() {
+        session.snoozed = snoozed.contains_key(&session.session_id);
+    }
+}
+
+#[tauri::command]
+fn snooze_session(state: tauri::State<Snoozed>, session_id: String, ts: f64) {
+    state.0.lock().unwrap().insert(session_id, ts);
+}
+
+#[tauri::command]
+fn unsnooze_session(state: tauri::State<Snoozed>, session_id: String) {
+    state.0.lock().unwrap().remove(&session_id);
 }
 
 fn sessions_from_dir(dir: PathBuf, stale_secs: f64, now: f64, out: &mut Vec<Session>) {
@@ -893,7 +927,7 @@ fn toggle_popover(app: &tauri::AppHandle) {
 fn notify_new_waiting(app: &tauri::AppHandle, sessions: &[Session], previous: &HashSet<String>) {
     for session in sessions {
         let newly_waiting =
-            session.status == "waiting" && !previous.contains(&session.session_id);
+            is_active_waiting(session) && !previous.contains(&session.session_id);
         if !newly_waiting {
             continue;
         }
@@ -949,6 +983,8 @@ pub fn run() {
             integrations::uninstall_integration,
             integrations::integration_status,
             integration_events,
+            snooze_session,
+            unsnooze_session,
             quit
         ])
         .setup(|app| {
@@ -970,6 +1006,7 @@ pub fn run() {
             app.manage(Mutex::new(settings));
             app.manage(Mutex::new(PlanUsageCache::default()));
             app.manage(permissions::PendingPermissions::default());
+            app.manage(Snoozed::default());
             permissions::spawn_server(app.handle().clone());
 
             let window = app.get_webview_window("main").expect("main window missing");
@@ -1017,7 +1054,12 @@ pub fn run() {
                         (settings.stale_hours * 3600.0, settings.notifications_enabled)
                     };
 
-                    let sessions = read_sessions(stale_secs);
+                    let mut sessions = read_sessions(stale_secs);
+                    {
+                        let snoozed_state = handle.state::<Snoozed>();
+                        let mut snoozed = snoozed_state.0.lock().unwrap();
+                        apply_snooze(&mut sessions, &mut snoozed);
+                    }
                     let _ = handle.emit("sessions", &sessions);
 
                     for session in &sessions {
@@ -1033,11 +1075,11 @@ pub fn run() {
                     }
                     previous_waiting = sessions
                         .iter()
-                        .filter(|s| s.status == "waiting")
+                        .filter(|s| is_active_waiting(s))
                         .map(|s| s.session_id.clone())
                         .collect();
 
-                    let waiting = sessions.iter().filter(|s| s.status == "waiting").count() as i64;
+                    let waiting = sessions.iter().filter(|s| is_active_waiting(s)).count() as i64;
                     if waiting != last {
                         last = waiting;
                         if let Some(tray) = handle.tray_by_id("main") {
@@ -1069,10 +1111,11 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        add_cursor_rule, add_rule_to_settings, aggregate_usage, applescript_escape, is_stale,
-        needs_accessibility, newest_event_by_provider, parse_usage_entry, session_from_value,
-        vscode_app_name, AppSettings,
+        add_cursor_rule, add_rule_to_settings, aggregate_usage, apply_snooze, applescript_escape,
+        is_stale, needs_accessibility, newest_event_by_provider, parse_usage_entry,
+        session_from_value, vscode_app_name, AppSettings,
     };
+    use std::collections::HashMap;
 
     #[test]
     fn sessions_without_provider_default_to_claude() {
@@ -1105,6 +1148,32 @@ mod tests {
             root,
             serde_json::json!({"permissions": {"allow": ["Bash(bun test:*)"]}})
         );
+    }
+
+    #[test]
+    fn snooze_holds_until_new_activity_then_prunes() {
+        let mk = |id: &str, ts: f64| {
+            session_from_value(
+                id.to_string(),
+                &serde_json::json!({"status": "waiting", "ts": ts}),
+            )
+        };
+        let mut snoozed: HashMap<String, f64> = HashMap::new();
+        snoozed.insert("a".into(), 100.0);
+        snoozed.insert("gone".into(), 100.0);
+
+        // "a" unchanged -> still snoozed; "b" never snoozed; "gone" absent -> pruned.
+        let mut sessions = vec![mk("a", 100.0), mk("b", 100.0)];
+        apply_snooze(&mut sessions, &mut snoozed);
+        assert!(sessions[0].snoozed);
+        assert!(!sessions[1].snoozed);
+        assert!(!snoozed.contains_key("gone"));
+
+        // "a" gets a newer event (ts advanced) -> auto-unsnoozed and pruned.
+        let mut later = vec![mk("a", 250.0)];
+        apply_snooze(&mut later, &mut snoozed);
+        assert!(!later[0].snoozed);
+        assert!(!snoozed.contains_key("a"));
     }
 
     #[test]

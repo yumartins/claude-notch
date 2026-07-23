@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	countByStatus,
+	countWaiting,
 	formatRelativeTime,
 	formatTokens,
 	formatWorkDuration,
@@ -41,6 +42,7 @@ function buildSession({ overrides }: BuildSessionParams = {}): Session {
 		provider: "claude",
 		started_at: 0,
 		ts: 1_000,
+		snoozed: false,
 		...overrides,
 	};
 }
@@ -69,6 +71,31 @@ describe("isAwaitingPermission", () => {
 		expect(isAwaitingPermission({ session: waiting })).toBe(true);
 		expect(isAwaitingPermission({ session: idlePrompt })).toBe(false);
 		expect(isAwaitingPermission({ session: running })).toBe(false);
+	});
+});
+
+describe("snooze", () => {
+	const waiting = () =>
+		buildSession({ overrides: { status: SessionStatus.Waiting } });
+
+	test("a snoozed session drops out of the waiting count", () => {
+		const sessions = [
+			waiting(),
+			buildSession({
+				overrides: { status: SessionStatus.Waiting, snoozed: true },
+			}),
+		];
+		expect(countWaiting({ sessions })).toBe(1);
+	});
+
+	test("snoozed sessions sink below active ones and read as Snoozed", () => {
+		const active = waiting();
+		const snoozed = buildSession({
+			overrides: { status: SessionStatus.Waiting, snoozed: true, ts: 9_999 },
+		});
+		const sorted = sortSessions({ sessions: [snoozed, active] });
+		expect(sorted[0]).toBe(active);
+		expect(getActivityLabel({ session: snoozed })).toBe("Snoozed");
 	});
 });
 

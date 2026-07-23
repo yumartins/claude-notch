@@ -490,3 +490,67 @@ describe("claude-permission.py", () => {
 		expect(result.stdout.trim()).toBe("");
 	});
 });
+
+describe("codex-permission.py", () => {
+	const payload = {
+		session_id: "k1",
+		cwd: "/tmp/demo",
+		tool_name: "Bash",
+		tool_input: { command: "cargo build" },
+	};
+	const file = ".claude-notch/status/codex-k1.json";
+
+	test("forwards allow decisions in the PermissionRequest format", async () => {
+		const home = makeHome();
+		let seen: Record<string, unknown> = {};
+		startFakeApp({ home, decision: "allow", onRequest: (r) => (seen = r) });
+
+		const result = await runHook({
+			script: "codex-permission.py",
+			payload,
+			home,
+		});
+
+		expect(JSON.parse(result.stdout)).toEqual({
+			hookSpecificOutput: {
+				hookEventName: "PermissionRequest",
+				decision: { behavior: "allow" },
+			},
+		});
+		expect(seen.provider).toBe("codex");
+		expect(seen.session_id).toBe("codex-k1");
+		const status = await readStatus({ home, file });
+		expect(status.status).toBe("running");
+		expect(status.provider).toBe("codex");
+	});
+
+	test("passthrough stays silent so the terminal prompt appears", async () => {
+		const home = makeHome();
+		startFakeApp({ home, decision: "passthrough" });
+
+		const result = await runHook({
+			script: "codex-permission.py",
+			payload,
+			home,
+		});
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout.trim()).toBe("");
+		const status = await readStatus({ home, file });
+		expect(status.status).toBe("waiting");
+		expect(status.type).toBe("permission_prompt");
+	});
+
+	test("fails open without the app", async () => {
+		const home = makeHome();
+
+		const result = await runHook({
+			script: "codex-permission.py",
+			payload,
+			home,
+		});
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout.trim()).toBe("");
+	});
+});
