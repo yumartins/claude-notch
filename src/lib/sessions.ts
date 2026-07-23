@@ -25,6 +25,8 @@ export interface Session {
 	limit_message: string;
 	context_tokens: number;
 	output_tokens: number;
+	provider: string;
+	started_at: number;
 	ts: number;
 }
 
@@ -125,6 +127,21 @@ export function formatRelativeTime({
 	if (seconds < 86_400) return `${Math.round(seconds / 3_600)}h`;
 
 	return `${Math.round(seconds / 86_400)}d`;
+}
+
+interface FormatWorkDurationParams {
+	startedAt: number;
+	ts: number;
+}
+
+export function formatWorkDuration({
+	startedAt,
+	ts,
+}: FormatWorkDurationParams): string {
+	if (!startedAt) return "";
+	const seconds = Math.max(0, ts - startedAt);
+	if (seconds < 3_600) return `${Math.max(1, Math.round(seconds / 60))}min`;
+	return `${toCompactDecimal({ value: seconds / 3_600 })}h`;
 }
 
 export function getFolderName({ path }: GetFolderNameParams): string {

@@ -8,10 +8,12 @@ import { StatsView } from "@/components/stats-view";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAppStats } from "@/hooks/use-app-stats";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useSessions } from "@/hooks/use-sessions";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { sleepingClawd } from "@/lib/clawd";
+import { findRequestForSession } from "@/lib/permissions";
 import { countByStatus, sortSessions } from "@/lib/sessions";
 import { Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -97,6 +99,7 @@ function EmptyState() {
 
 export default function App() {
 	const sessions = useSessions();
+	const requests = usePermissions();
 	const sorted = sortSessions({ sessions });
 	const counts = countByStatus({ sessions });
 	const { stats, version } = useAppStats();
@@ -135,7 +138,7 @@ export default function App() {
 			<header className="relative flex flex-none items-center justify-between px-3.5 pt-3 pb-2">
 				<span className="flex items-center gap-2">
 					<span className="size-1.5 rounded-full bg-primary" />
-					<h1 className="font-bold text-sm tracking-tight">Claude Code</h1>
+					<h1 className="font-bold text-sm tracking-tight">Claude Notch</h1>
 					<span className="text-muted-foreground/70 text-xs tabular-nums">
 						{sessions.length > 0 ? totalLabel : ""}
 					</span>
@@ -173,6 +176,10 @@ export default function App() {
 							<SessionRow
 								key={session.session_id}
 								session={session}
+								request={findRequestForSession({
+									requests,
+									sessionId: session.session_id,
+								})}
 								index={index}
 								onShowUsage={() => setSheet(Sheet.Metrics)}
 							/>
