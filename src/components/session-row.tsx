@@ -33,6 +33,7 @@ import {
 	getSessionStatus,
 	getTerminalLabel,
 	hasUsageLimit,
+	isActivelyWaiting,
 	isAwaitingPermission,
 	type Session,
 	SessionStatus,
@@ -56,6 +57,11 @@ interface SessionCommandParams {
 	sessionId: string;
 }
 
+interface SnoozeParams {
+	sessionId: string;
+	ts: number;
+}
+
 interface RespondSessionParams {
 	sessionId: string;
 	approve: boolean;
@@ -74,6 +80,14 @@ const STATUS_TEXT_CLASSES: Record<SessionStatus, string> = {
 
 function focusSession({ sessionId }: SessionCommandParams) {
 	invoke("focus_session", { sessionId }).catch(console.error);
+}
+
+function snoozeSession({ sessionId, ts }: SnoozeParams) {
+	invoke("snooze_session", { sessionId, ts }).catch(console.error);
+}
+
+function unsnoozeSession({ sessionId }: SessionCommandParams) {
+	invoke("unsnooze_session", { sessionId }).catch(console.error);
 }
 
 interface ReplyBoxProps {
@@ -332,7 +346,7 @@ export function SessionRow({
 	onShowUsage,
 }: SessionRowProps) {
 	const status = getSessionStatus({ session });
-	const isWaiting = status === SessionStatus.Waiting;
+	const isWaiting = isActivelyWaiting({ session });
 	const isLimited = hasUsageLimit({ session });
 	const provider = getProvider({ session });
 	const keystrokeFallback =
@@ -393,7 +407,9 @@ export function SessionRow({
 					<span
 						className={cn(
 							"block truncate text-sm",
-							isLimited ? "text-destructive" : STATUS_TEXT_CLASSES[status],
+							isLimited && "text-destructive",
+							!isLimited && session.snoozed && "text-muted-foreground",
+							!isLimited && !session.snoozed && STATUS_TEXT_CLASSES[status],
 						)}
 					>
 						{getActivityLabel({ session })}
@@ -436,6 +452,27 @@ export function SessionRow({
 					<ReplyBox sessionId={session.session_id} />
 				) : null}
 				{error ? <p className="text-destructive text-xs">{error}</p> : null}
+				{session.snoozed ? (
+					<Button
+						size="sm"
+						variant="ghost-muted"
+						className="w-full"
+						onClick={() => unsnoozeSession({ sessionId: session.session_id })}
+					>
+						Un-snooze
+					</Button>
+				) : isWaiting ? (
+					<Button
+						size="sm"
+						variant="ghost-muted"
+						className="w-full"
+						onClick={() =>
+							snoozeSession({ sessionId: session.session_id, ts: session.ts })
+						}
+					>
+						Snooze
+					</Button>
+				) : null}
 				<Button
 					size="sm"
 					variant="ghost-muted"

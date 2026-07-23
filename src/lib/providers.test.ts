@@ -29,6 +29,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 		provider: Provider.Claude,
 		started_at: 0,
 		ts: 0,
+		snoozed: false,
 		...overrides,
 	};
 }

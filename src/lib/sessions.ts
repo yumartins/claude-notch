@@ -28,6 +28,7 @@ export interface Session {
 	provider: string;
 	started_at: number;
 	ts: number;
+	snoozed: boolean;
 }
 
 interface FormatTokensParams {
@@ -99,6 +100,12 @@ export function isAwaitingPermission({ session }: SessionParams): boolean {
 	);
 }
 
+export function isActivelyWaiting({ session }: SessionParams): boolean {
+	return (
+		getSessionStatus({ session }) === SessionStatus.Waiting && !session.snoozed
+	);
+}
+
 export function getTerminalLabel({ session }: SessionParams): string {
 	return (
 		TERMINAL_LABELS[session.term_program] ??
@@ -107,6 +114,7 @@ export function getTerminalLabel({ session }: SessionParams): string {
 }
 
 export function getActivityLabel({ session }: SessionParams): string {
+	if (session.snoozed) return "Snoozed";
 	if (hasUsageLimit({ session })) return "Usage limit reached";
 	const isRunningTool =
 		getSessionStatus({ session }) === SessionStatus.Running &&
@@ -172,9 +180,7 @@ export function countByStatus({ sessions }: SessionsParams): StatusCounts {
 }
 
 export function countWaiting({ sessions }: SessionsParams): number {
-	return sessions.filter(
-		(session) => getSessionStatus({ session }) === SessionStatus.Waiting,
-	).length;
+	return sessions.filter((session) => isActivelyWaiting({ session })).length;
 }
 
 export function sortSessions({ sessions }: SessionsParams): Session[] {
@@ -183,7 +189,7 @@ export function sortSessions({ sessions }: SessionsParams): Session[] {
 
 function compareSessions(a: Session, b: Session): number {
 	const waitingRank = (session: Session) =>
-		getSessionStatus({ session }) === SessionStatus.Waiting ? 0 : 1;
+		isActivelyWaiting({ session }) ? 0 : 1;
 	return waitingRank(a) - waitingRank(b) || (b.ts || 0) - (a.ts || 0);
 }
 
