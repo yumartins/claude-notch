@@ -309,6 +309,17 @@ describe("cursor-hook.py", () => {
 			"git push",
 		);
 		expect((await readStatus({ home, file })).status).toBe("running");
+
+		// The command also lands in the transcript as a tool line.
+		const transcript = await Bun.file(
+			join(home, ".claude-notch/transcripts/cursor-v1.jsonl"),
+		).text();
+		const last = JSON.parse(transcript.trim().split("\n").at(-1) as string);
+		expect(last.message.content[0]).toEqual({
+			type: "tool_use",
+			name: "Shell",
+			input: { command: "git push" },
+		});
 	});
 
 	test("denials also flow back to Cursor", async () => {

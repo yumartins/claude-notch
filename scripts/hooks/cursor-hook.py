@@ -158,6 +158,7 @@ if event not in GATING_EVENTS:
 tool_name, tool_input = gating_tool(data)
 summary = tool_summary(tool_name, tool_input)
 cwd = (data.get("workspace_roots") or [""])[0]
+append_transcript(assistant_tool(tool_name, tool_input))
 
 if is_pre_approved(cwd, tool_name, tool_input):
     # "Always allow" grant: approve without prompting or hitting the app.
