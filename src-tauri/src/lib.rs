@@ -1,3 +1,6 @@
+mod integrations;
+mod permissions;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::process::Command;
@@ -20,10 +23,13 @@ const TYPE_CLAUDE_SCRIPT: &str = r#"delay 1.2
 tell application "System Events" to keystroke "claude"
 tell application "System Events" to key code 36"#;
 
-/// One Claude Code session, derived from a ~/.claude/status/<session_id>.json file.
+/// One agent session, derived from a status json file written by a provider
+/// hook (~/.claude/status for Claude Code, ~/.claude-notch/status for the rest).
 #[derive(Serialize, Clone)]
 struct Session {
     session_id: String,
+    provider: String,
+    started_at: f64,
     project: String,
     cwd: String,
     status: String,
@@ -50,7 +56,7 @@ struct AppStats {
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
-struct AppSettings {
+pub(crate) struct AppSettings {
     shortcut: String,
     launcher_terminal: String,
     notifications_enabled: bool,
@@ -68,9 +74,20 @@ impl Default for AppSettings {
     }
 }
 
+pub(crate) fn home_dir() -> PathBuf {
+    PathBuf::from(std::env::var("HOME").unwrap_or_default())
+}
+
+pub(crate) fn notch_dir() -> PathBuf {
+    home_dir().join(".claude-notch")
+}
+
 fn status_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".claude").join("status")
+    home_dir().join(".claude").join("status")
+}
+
+fn notch_status_dir() -> PathBuf {
+    notch_dir().join("status")
 }
 
 fn config_file(app: &tauri::AppHandle, name: &str) -> Option<PathBuf> {
@@ -120,21 +137,49 @@ fn is_stale(ts: f64, now: f64, stale_secs: f64) -> bool {
     ts <= 0.0 || now - ts > stale_secs
 }
 
-fn now_epoch() -> f64 {
+pub(crate) fn now_epoch() -> f64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs_f64())
         .unwrap_or(0.0)
 }
 
-/// Read every status file and turn it into a Session. Missing/garbage/stale
-/// files are skipped.
-fn read_sessions(stale_secs: f64) -> Vec<Session> {
-    let mut out = Vec::new();
-    let Ok(entries) = fs::read_dir(status_dir()) else {
-        return out;
+/// One status json -> Session. Files without a provider are Claude's: they
+/// predate multi-provider support.
+fn session_from_value(session_id: String, v: &serde_json::Value) -> Session {
+    let get = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let get_u64 = |k: &str| v.get(k).and_then(|x| x.as_u64()).unwrap_or(0);
+    let get_f64 = |k: &str| v.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0);
+    let provider = match get("provider").is_empty() {
+        true => "claude".to_string(),
+        false => get("provider"),
     };
-    let now = now_epoch();
+    Session {
+        session_id,
+        provider,
+        started_at: get_f64("started_at"),
+        project: get("project"),
+        cwd: get("cwd"),
+        status: get("status"),
+        message: get("message"),
+        tool: get("tool"),
+        tool_name: get("tool_name"),
+        tool_input: v.get("tool_input").cloned().unwrap_or(serde_json::Value::Null),
+        kind: get("type"),
+        tty: get("tty"),
+        term_program: get("term_program"),
+        last_message: get("last_message"),
+        limit_message: get("limit_message"),
+        context_tokens: get_u64("context_tokens"),
+        output_tokens: get_u64("output_tokens"),
+        ts: get_f64("ts"),
+    }
+}
+
+fn sessions_from_dir(dir: PathBuf, stale_secs: f64, now: f64, out: &mut Vec<Session>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
@@ -155,33 +200,32 @@ fn read_sessions(stale_secs: f64) -> Vec<Session> {
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_string();
-        let get = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-        let get_u64 = |k: &str| v.get(k).and_then(|x| x.as_u64()).unwrap_or(0);
-        out.push(Session {
-            session_id,
-            project: get("project"),
-            cwd: get("cwd"),
-            status: get("status"),
-            message: get("message"),
-            tool: get("tool"),
-            tool_name: get("tool_name"),
-            tool_input: v.get("tool_input").cloned().unwrap_or(serde_json::Value::Null),
-            kind: get("type"),
-            tty: get("tty"),
-            term_program: get("term_program"),
-            last_message: get("last_message"),
-            limit_message: get("limit_message"),
-            context_tokens: get_u64("context_tokens"),
-            output_tokens: get_u64("output_tokens"),
-            ts,
-        });
+        out.push(session_from_value(session_id, &v));
     }
+}
+
+/// Read every status file (all providers) and turn it into a Session.
+/// Missing/garbage/stale files are skipped.
+fn read_sessions(stale_secs: f64) -> Vec<Session> {
+    let mut out = Vec::new();
+    let now = now_epoch();
+    sessions_from_dir(status_dir(), stale_secs, now, &mut out);
+    sessions_from_dir(notch_status_dir(), stale_secs, now, &mut out);
     out
 }
 
 fn read_session_file(session_id: &str) -> Option<serde_json::Value> {
-    let text = fs::read_to_string(status_dir().join(format!("{session_id}.json"))).ok()?;
+    let name = format!("{session_id}.json");
+    let text = fs::read_to_string(status_dir().join(&name))
+        .or_else(|_| fs::read_to_string(notch_status_dir().join(&name)))
+        .ok()?;
     serde_json::from_str(&text).ok()
+}
+
+fn session_provider(session_id: &str) -> String {
+    read_session_file(session_id)
+        .map(|v| session_from_value(session_id.to_string(), &v).provider)
+        .unwrap_or_else(|| "claude".to_string())
 }
 
 const TRANSCRIPT_TAIL_BYTES: usize = 131_072;
@@ -427,9 +471,17 @@ fn session_focus_script(session_id: &str) -> Result<String, String> {
     focus_script(term, &tty).or_else(|_| focus_script(FALLBACK_TERM_PROGRAM, &tty))
 }
 
+#[cfg(target_os = "macos")]
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXIsProcessTrusted() -> bool;
+}
+
+// Non-mac builds only exist for `cargo test` in CI; keystrokes never run there.
+#[cfg(not(target_os = "macos"))]
+#[allow(non_snake_case)]
+unsafe fn AXIsProcessTrusted() -> bool {
+    true
 }
 
 fn needs_accessibility(script: &str) -> bool {
@@ -476,6 +528,9 @@ fn focus_session(session_id: String) -> Result<(), String> {
 /// Needs the macOS Accessibility permission (System Events keystrokes).
 #[tauri::command]
 fn respond_session(session_id: String, approve: bool) -> Result<(), String> {
+    if session_provider(&session_id) != "claude" {
+        return Err("resposta por teclado disponível apenas para Claude Code".into());
+    }
     let focus = session_focus_script(&session_id)?;
     let key = match approve {
         true => r#"keystroke "1""#,
@@ -545,6 +600,9 @@ fn is_awaiting_permission(session_id: &str) -> bool {
 /// prompt is dismissed first (Esc) so the text lands in the input box.
 #[tauri::command]
 fn send_text(session_id: String, text: String) -> Result<(), String> {
+    if session_provider(&session_id) == "cursor" {
+        return Err("envio de texto indisponível para sessões do Cursor".into());
+    }
     let clean: String = text.replace(['\n', '\r'], " ");
     if clean.trim().is_empty() {
         return Err("mensagem vazia".into());
@@ -744,11 +802,14 @@ async fn pick_folder(app: tauri::AppHandle) -> Option<String> {
     // Accessory apps are never activated by macOS on their own, so an
     // unparented NSOpenPanel opens behind every other window. Activate first.
     let _ = app.run_on_main_thread(|| {
-        let Some(mtm) = objc2::MainThreadMarker::new() else {
-            return;
-        };
-        #[allow(deprecated)]
-        objc2_app_kit::NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
+        #[cfg(target_os = "macos")]
+        {
+            let Some(mtm) = objc2::MainThreadMarker::new() else {
+                return;
+            };
+            #[allow(deprecated)]
+            objc2_app_kit::NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
+        }
     });
     DIALOG_OPEN.store(true, Ordering::SeqCst);
     let picked = app.dialog().file().blocking_pick_folder();
@@ -836,6 +897,11 @@ pub fn run() {
             pick_folder,
             app_stats,
             plan_usage,
+            permissions::resolve_permission,
+            permissions::pending_permissions,
+            integrations::install_integration,
+            integrations::uninstall_integration,
+            integrations::integration_status,
             quit
         ])
         .setup(|app| {
@@ -856,6 +922,8 @@ pub fn run() {
             }
             app.manage(Mutex::new(settings));
             app.manage(Mutex::new(PlanUsageCache::default()));
+            app.manage(permissions::PendingPermissions::default());
+            permissions::spawn_server(app.handle().clone());
 
             let window = app.get_webview_window("main").expect("main window missing");
             let _ = window.set_shadow(true);
@@ -875,7 +943,7 @@ pub fn run() {
             TrayIconBuilder::with_id("main")
                 .icon(Image::from_bytes(TRAY_IDLE)?)
                 .icon_as_template(true)
-                .tooltip("Claude Code")
+                .tooltip("Claude Notch")
                 .on_tray_icon_event(|tray, event| {
                     tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
                     if let TrayIconEvent::Click {
@@ -955,8 +1023,30 @@ pub fn run() {
 mod tests {
     use super::{
         add_rule_to_settings, aggregate_usage, applescript_escape, is_stale, needs_accessibility,
-        parse_usage_entry, vscode_app_name, AppSettings,
+        parse_usage_entry, session_from_value, vscode_app_name, AppSettings,
     };
+
+    #[test]
+    fn sessions_without_provider_default_to_claude() {
+        let v = serde_json::json!({"status": "running", "ts": 10.0});
+        let session = session_from_value("abc".into(), &v);
+        assert_eq!(session.provider, "claude");
+        assert_eq!(session.started_at, 0.0);
+    }
+
+    #[test]
+    fn provider_and_started_at_are_read_from_the_status_file() {
+        let v = serde_json::json!({
+            "status": "waiting",
+            "provider": "codex",
+            "started_at": 42.5,
+            "ts": 100.0,
+        });
+        let session = session_from_value("codex-abc".into(), &v);
+        assert_eq!(session.provider, "codex");
+        assert_eq!(session.started_at, 42.5);
+        assert_eq!(session.status, "waiting");
+    }
 
     #[test]
     fn rules_are_added_once_into_permissions_allow() {

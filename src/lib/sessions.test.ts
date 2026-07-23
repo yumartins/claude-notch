@@ -3,6 +3,7 @@ import {
 	countByStatus,
 	formatRelativeTime,
 	formatTokens,
+	formatWorkDuration,
 	getActivityLabel,
 	getFolderName,
 	getStatusLabel,
@@ -37,6 +38,8 @@ function buildSession({ overrides }: BuildSessionParams = {}): Session {
 		limit_message: "",
 		context_tokens: 0,
 		output_tokens: 0,
+		provider: "claude",
+		started_at: 0,
 		ts: 1_000,
 		...overrides,
 	};
@@ -197,6 +200,30 @@ describe("formatRelativeTime", () => {
 
 	test("future timestamps clamp to now", () => {
 		expect(formatRelativeTime({ timestamp: 200, now: 100 })).toBe("agora");
+	});
+});
+
+describe("formatWorkDuration", () => {
+	test("empty without a start timestamp", () => {
+		expect(formatWorkDuration({ startedAt: 0, ts: 1_000 })).toBe("");
+	});
+
+	test("short sessions round up to one minute", () => {
+		expect(formatWorkDuration({ startedAt: 100, ts: 110 })).toBe("1min");
+	});
+
+	test("minutes", () => {
+		expect(formatWorkDuration({ startedAt: 100, ts: 100 + 720 })).toBe("12min");
+	});
+
+	test("hours use pt-BR decimal comma", () => {
+		expect(formatWorkDuration({ startedAt: 100, ts: 100 + 5_400 })).toBe(
+			"1,5h",
+		);
+	});
+
+	test("a start after the last activity clamps to one minute", () => {
+		expect(formatWorkDuration({ startedAt: 500, ts: 100 })).toBe("1min");
 	});
 });
 

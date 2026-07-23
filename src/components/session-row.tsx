@@ -11,10 +11,24 @@ import {
 } from "@/components/ui/collapsible";
 import { Textarea } from "@/components/ui/textarea";
 import { getClawdArt } from "@/lib/clawd";
+import {
+	getRequestToolSummary,
+	PermissionDecision,
+	type PermissionRequest,
+} from "@/lib/permissions";
+import {
+	getProvider,
+	getProviderLabel,
+	Provider,
+	supportsPermissionRules,
+	supportsTerminalReply,
+	supportsTranscript,
+} from "@/lib/providers";
 import { suggestRule } from "@/lib/rules";
 import {
 	formatRelativeTime,
 	formatTokens,
+	formatWorkDuration,
 	getActivityLabel,
 	getSessionStatus,
 	getTerminalLabel,
@@ -28,6 +42,7 @@ import { cn } from "@/lib/utils";
 
 interface SessionRowProps {
 	session: Session;
+	request?: PermissionRequest;
 	index: number;
 	onShowUsage: () => void;
 }
@@ -191,6 +206,101 @@ function PermissionCard({ session, onError }: PermissionCardProps) {
 	);
 }
 
+interface SocketPermissionCardProps {
+	session: Session;
+	request: PermissionRequest;
+	onError: (params: { message: string }) => void;
+}
+
+interface ResolveParams {
+	decision: PermissionDecision;
+}
+
+const PASSTHROUGH_LABELS: Record<Provider, string> = {
+	[Provider.Claude]: "Responder no terminal",
+	[Provider.Codex]: "Responder no terminal",
+	[Provider.Cursor]: "Responder no Cursor",
+};
+
+// Approval card for requests arriving over the app socket: the agent hook is
+// blocked waiting, so the decision goes straight back to it — no keystrokes.
+function SocketPermissionCard({
+	session,
+	request,
+	onError,
+}: SocketPermissionCardProps) {
+	const detail = getToolDetail({
+		toolName: request.tool_name,
+		toolInput: request.tool_input,
+	});
+	const rule = suggestRule({
+		toolName: request.tool_name,
+		toolInput: request.tool_input,
+	});
+
+	function resolve({ decision }: ResolveParams) {
+		invoke("resolve_permission", {
+			requestId: request.request_id,
+			decision,
+		}).catch((err) => onError({ message: String(err) }));
+	}
+
+	async function alwaysAllow() {
+		try {
+			await invoke("add_permission_rule", { cwd: request.cwd, rule });
+			resolve({ decision: PermissionDecision.Allow });
+		} catch (err) {
+			onError({ message: String(err) });
+		}
+	}
+
+	return (
+		<div className="space-y-2">
+			{detail ? (
+				<ToolDetailView detail={detail} />
+			) : (
+				<p className="truncate rounded-r-lg border-status-waiting/60 border-l-2 bg-status-waiting/10 px-2.5 py-2 font-mono text-sm text-status-waiting">
+					{getRequestToolSummary({ request })}
+				</p>
+			)}
+			<div className="flex gap-2">
+				<Button
+					className="flex-1 rounded-md font-semibold"
+					onClick={() => resolve({ decision: PermissionDecision.Allow })}
+				>
+					Aprovar
+				</Button>
+				<Button
+					variant="secondary"
+					className="flex-1 rounded-md font-semibold"
+					onClick={() => resolve({ decision: PermissionDecision.Deny })}
+				>
+					Negar
+				</Button>
+			</div>
+			<Button
+				size="xs"
+				variant="ghost-muted"
+				className="w-full"
+				onClick={() => resolve({ decision: PermissionDecision.Passthrough })}
+			>
+				{PASSTHROUGH_LABELS[getProvider({ session })]}
+			</Button>
+			{supportsPermissionRules({ session }) && rule && request.cwd ? (
+				<Button
+					size="xs"
+					variant="ghost-muted"
+					title={rule}
+					className="w-full"
+					onClick={alwaysAllow}
+				>
+					Sempre permitir
+				</Button>
+			) : null}
+		</div>
+	);
+}
+
 function LimitCard({ message, onShowUsage }: LimitCardProps) {
 	return (
 		<div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5">
@@ -209,18 +319,32 @@ function LimitCard({ message, onShowUsage }: LimitCardProps) {
 	);
 }
 
-export function SessionRow({ session, index, onShowUsage }: SessionRowProps) {
+export function SessionRow({
+	session,
+	request,
+	index,
+	onShowUsage,
+}: SessionRowProps) {
 	const status = getSessionStatus({ session });
 	const isWaiting = status === SessionStatus.Waiting;
 	const isLimited = hasUsageLimit({ session });
-	const awaitingPermission = isAwaitingPermission({ session });
+	const provider = getProvider({ session });
+	const keystrokeFallback =
+		!request &&
+		provider === Provider.Claude &&
+		isAwaitingPermission({ session });
 	const [error, setError] = useState("");
 
+	const duration = formatWorkDuration({
+		startedAt: session.started_at,
+		ts: session.ts,
+	});
 	const metaLine = [
 		session.cwd,
 		session.context_tokens > 0
 			? `${formatTokens({ count: session.context_tokens })} ctx`
 			: "",
+		duration ? `${duration} de sessão` : "",
 		getTerminalLabel({ session }),
 	]
 		.filter(Boolean)
@@ -243,8 +367,15 @@ export function SessionRow({ session, index, onShowUsage }: SessionRowProps) {
 				/>
 				<span className="min-w-0 flex-1">
 					<span className="flex items-baseline justify-between gap-2">
-						<span className="truncate font-semibold text-base text-foreground tracking-tight">
-							{session.project || "sem-nome"}
+						<span className="flex min-w-0 items-baseline gap-1.5">
+							<span className="truncate font-semibold text-base text-foreground tracking-tight">
+								{session.project || "sem-nome"}
+							</span>
+							{provider !== Provider.Claude ? (
+								<span className="flex-none rounded-sm bg-secondary px-1.5 font-medium text-muted-foreground text-xs">
+									{getProviderLabel({ session })}
+								</span>
+							) : null}
 						</span>
 						<span className="flex-none text-muted-foreground text-xs tabular-nums">
 							{formatRelativeTime({
@@ -276,14 +407,25 @@ export function SessionRow({ session, index, onShowUsage }: SessionRowProps) {
 						onShowUsage={onShowUsage}
 					/>
 				) : null}
-				{awaitingPermission ? (
+				{request ? (
+					<SocketPermissionCard
+						session={session}
+						request={request}
+						onError={({ message }) => setError(message)}
+					/>
+				) : null}
+				{keystrokeFallback ? (
 					<PermissionCard
 						session={session}
 						onError={({ message }) => setError(message)}
 					/>
 				) : null}
-				<TranscriptPreview sessionId={session.session_id} />
-				<ReplyBox sessionId={session.session_id} />
+				{supportsTranscript({ session }) ? (
+					<TranscriptPreview sessionId={session.session_id} />
+				) : null}
+				{supportsTerminalReply({ session }) ? (
+					<ReplyBox sessionId={session.session_id} />
+				) : null}
 				{error ? <p className="text-destructive text-xs">{error}</p> : null}
 				<Button
 					size="sm"

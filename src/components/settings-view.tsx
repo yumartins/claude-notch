@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { IntegrationsSection } from "@/components/integrations-section";
 import { SheetPanel } from "@/components/sheet-panel";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -123,6 +124,13 @@ export function SettingsView({
 								: formatShortcutGlyphs({ shortcut: form.shortcut })}
 						</span>
 					</Button>
+				</Section>
+
+				<Section
+					label="Integrações"
+					hint="Instala hooks na configuração de cada agente; valem para novas sessões"
+				>
+					<IntegrationsSection />
 				</Section>
 
 				<Section label="Terminal padrão">

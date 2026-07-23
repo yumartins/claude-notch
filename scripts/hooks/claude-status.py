@@ -168,6 +168,8 @@ compute_totals = status in ("waiting", "idle")
 
 status_file.write_text(json.dumps({
     "status": status,
+    "provider": "claude",
+    "started_at": previous.get("started_at") or time.time(),
     "project": os.path.basename(data.get("cwd", "")),
     "cwd": data.get("cwd", ""),
     "message": data.get("message", ""),

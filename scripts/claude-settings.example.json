@@ -1,45 +1,57 @@
 {
   "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude-notch/hooks/claude-permission.py\"",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "matcher": "permission_prompt|idle_prompt",
         "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/status.py waiting" }
+          { "type": "command", "command": "python3 \"$HOME/.claude-notch/hooks/claude-status.py\" waiting" }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/status.py running" }
+          { "type": "command", "command": "python3 \"$HOME/.claude-notch/hooks/claude-status.py\" running" }
         ]
       }
     ],
     "PreToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/status.py running" }
+          { "type": "command", "command": "python3 \"$HOME/.claude-notch/hooks/claude-status.py\" running" }
         ]
       }
     ],
     "PostToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/status.py running" }
+          { "type": "command", "command": "python3 \"$HOME/.claude-notch/hooks/claude-status.py\" running" }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/status.py idle" }
+          { "type": "command", "command": "python3 \"$HOME/.claude-notch/hooks/claude-status.py\" idle" }
         ]
       }
     ],
     "SessionEnd": [
       {
         "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/status.py end" }
+          { "type": "command", "command": "python3 \"$HOME/.claude-notch/hooks/claude-status.py\" end" }
         ]
       }
     ]
