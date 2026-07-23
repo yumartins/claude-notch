@@ -11,6 +11,7 @@ import os
 import pathlib
 import socket
 import tempfile
+import time
 
 CONNECT_TIMEOUT = 0.25
 
@@ -69,3 +70,59 @@ def request_decision(request, response_timeout):
         return None
     finally:
         conn.close()
+
+
+def _tool_summary(data):
+    tool = data.get("tool_name", "")
+    tool_input = data.get("tool_input") or {}
+    detail = tool_input.get("command") or tool_input.get("file_path") or tool_input.get("path") or ""
+    detail = " ".join(str(detail).split())[:120]
+    return f"{tool} · {detail}" if detail else tool
+
+
+def gate_permission(provider, session_id, status_file, data, response_timeout):
+    """Shared PermissionRequest flow for Claude and Codex, whose hook contracts
+    are identical: block while the app shows the approval card, then answer with
+    the documented decision JSON. Stays silent on passthrough or an unreachable
+    app so the agent's own terminal prompt appears (fail-open)."""
+    previous = read_status(status_file)
+
+    def write(status):
+        state = dict(previous)
+        state.update({
+            "status": status,
+            "provider": provider,
+            "started_at": previous.get("started_at") or time.time(),
+            "project": os.path.basename(data.get("cwd", "")) or previous.get("project", ""),
+            "cwd": data.get("cwd", "") or previous.get("cwd", ""),
+            "tool": _tool_summary(data),
+            "tool_name": data.get("tool_name", ""),
+            "tool_input": data.get("tool_input"),
+            "type": "permission_prompt" if status == "waiting" else "",
+            "ts": time.time(),
+        })
+        write_status(status_file, state)
+
+    write("waiting")
+    decision = request_decision({
+        "kind": "permission_request",
+        "provider": provider,
+        "session_id": session_id,
+        "tool_name": data.get("tool_name", ""),
+        "tool_input": data.get("tool_input"),
+        "cwd": data.get("cwd", ""),
+        "project": os.path.basename(data.get("cwd", "")),
+    }, response_timeout)
+
+    if decision is None:
+        write("running")
+        return
+    if decision == "passthrough":
+        return
+    write("running")
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PermissionRequest",
+            "decision": {"behavior": decision},
+        },
+    }))
