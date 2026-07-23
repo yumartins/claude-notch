@@ -107,7 +107,7 @@ fn notify_request(app: &tauri::AppHandle, request: &PendingPermission) {
     let _ = app
         .notification()
         .builder()
-        .title(format!("{} pede permissão", request.project))
+        .title(format!("{} requests permission", request.project))
         .body(request.tool_name.clone())
         .show();
 }
@@ -155,11 +155,11 @@ pub fn resolve_permission(
     decision: String,
 ) -> Result<(), String> {
     if !is_valid_decision(&decision) {
-        return Err("decisão inválida".into());
+        return Err("invalid decision".into());
     }
     let map = state.0.lock().unwrap();
     let Some((_, tx)) = map.get(&request_id) else {
-        return Err("pedido de permissão não encontrado".into());
+        return Err("permission request not found".into());
     };
     tx.send(decision).map_err(|e| e.to_string())
 }

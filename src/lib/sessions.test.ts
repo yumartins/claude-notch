@@ -105,7 +105,7 @@ describe("getActivityLabel", () => {
 		const session = buildSession({
 			overrides: { status: SessionStatus.Running, tool: "" },
 		});
-		expect(getActivityLabel({ session })).toBe("Trabalhando…");
+		expect(getActivityLabel({ session })).toBe("Working…");
 	});
 
 	test("waiting sessions keep the waiting label even with a tool", () => {
@@ -116,7 +116,7 @@ describe("getActivityLabel", () => {
 				tool: "Bash · rm -rf node_modules",
 			},
 		});
-		expect(getActivityLabel({ session })).toBe("Aguardando permissão");
+		expect(getActivityLabel({ session })).toBe("Waiting for permission");
 	});
 });
 
@@ -137,7 +137,7 @@ describe("hasUsageLimit", () => {
 				limit_message: "5-hour limit reached",
 			},
 		});
-		expect(getActivityLabel({ session })).toBe("Limite de uso atingido");
+		expect(getActivityLabel({ session })).toBe("Usage limit reached");
 	});
 });
 
@@ -149,7 +149,7 @@ describe("getStatusLabel", () => {
 				type: SessionKind.PermissionPrompt,
 			},
 		});
-		expect(getStatusLabel({ session })).toBe("Aguardando permissão");
+		expect(getStatusLabel({ session })).toBe("Waiting for permission");
 	});
 
 	test("waiting on an idle prompt", () => {
@@ -159,19 +159,19 @@ describe("getStatusLabel", () => {
 				type: SessionKind.IdlePrompt,
 			},
 		});
-		expect(getStatusLabel({ session })).toBe("Ocioso, aguardando você");
+		expect(getStatusLabel({ session })).toBe("Idle, waiting for you");
 	});
 
 	test("running", () => {
 		const session = buildSession({
 			overrides: { status: SessionStatus.Running },
 		});
-		expect(getStatusLabel({ session })).toBe("Trabalhando…");
+		expect(getStatusLabel({ session })).toBe("Working…");
 	});
 
 	test("unknown status falls back to idle", () => {
 		const session = buildSession({ overrides: { status: "garbage" } });
-		expect(getStatusLabel({ session })).toBe("Sem pendências");
+		expect(getStatusLabel({ session })).toBe("Nothing pending");
 	});
 });
 
@@ -181,7 +181,7 @@ describe("formatRelativeTime", () => {
 	});
 
 	test("under 45s reads as now", () => {
-		expect(formatRelativeTime({ timestamp: 100, now: 130 })).toBe("agora");
+		expect(formatRelativeTime({ timestamp: 100, now: 130 })).toBe("now");
 	});
 
 	test("minutes", () => {
@@ -199,7 +199,7 @@ describe("formatRelativeTime", () => {
 	});
 
 	test("future timestamps clamp to now", () => {
-		expect(formatRelativeTime({ timestamp: 200, now: 100 })).toBe("agora");
+		expect(formatRelativeTime({ timestamp: 200, now: 100 })).toBe("now");
 	});
 });
 
@@ -216,9 +216,9 @@ describe("formatWorkDuration", () => {
 		expect(formatWorkDuration({ startedAt: 100, ts: 100 + 720 })).toBe("12min");
 	});
 
-	test("hours use pt-BR decimal comma", () => {
+	test("hours use a compact decimal", () => {
 		expect(formatWorkDuration({ startedAt: 100, ts: 100 + 5_400 })).toBe(
-			"1,5h",
+			"1.5h",
 		);
 	});
 
@@ -273,13 +273,13 @@ describe("formatTokens", () => {
 		expect(formatTokens({ count: 950 })).toBe("950");
 	});
 
-	test("thousands use k with pt-BR decimal comma", () => {
+	test("thousands use k with a compact decimal", () => {
 		expect(formatTokens({ count: 1_000 })).toBe("1k");
-		expect(formatTokens({ count: 89_400 })).toBe("89,4k");
+		expect(formatTokens({ count: 89_400 })).toBe("89.4k");
 	});
 
 	test("millions use M", () => {
-		expect(formatTokens({ count: 1_234_567 })).toBe("1,2M");
+		expect(formatTokens({ count: 1_234_567 })).toBe("1.2M");
 	});
 });
 
@@ -290,13 +290,13 @@ describe("getSummary", () => {
 			buildSession({ overrides: { status: SessionStatus.Waiting } }),
 			buildSession({ overrides: { status: SessionStatus.Running } }),
 		];
-		expect(getSummary({ sessions })).toBe("2 aguardando");
+		expect(getSummary({ sessions })).toBe("2 waiting");
 	});
 
 	test("falls back to total count", () => {
-		expect(getSummary({ sessions: [buildSession()] })).toBe("1 sessão");
+		expect(getSummary({ sessions: [buildSession()] })).toBe("1 session");
 		expect(getSummary({ sessions: [buildSession(), buildSession()] })).toBe(
-			"2 sessões",
+			"2 sessions",
 		);
 	});
 

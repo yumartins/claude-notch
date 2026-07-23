@@ -233,13 +233,13 @@ const TRANSCRIPT_TAIL_BYTES: usize = 131_072;
 /// Raw tail of the session transcript; the frontend parses the jsonl.
 #[tauri::command]
 async fn read_transcript_tail(session_id: String) -> Result<String, String> {
-    let v = read_session_file(&session_id).ok_or("sessão não encontrada")?;
+    let v = read_session_file(&session_id).ok_or("session not found")?;
     let path = v
         .get("transcript_path")
         .and_then(|x| x.as_str())
         .unwrap_or("");
     if path.is_empty() {
-        return Err("transcript indisponível".into());
+        return Err("transcript unavailable".into());
     }
     let data = fs::read(path).map_err(|e| e.to_string())?;
     let start = data.len().saturating_sub(TRANSCRIPT_TAIL_BYTES);
@@ -453,7 +453,7 @@ end tell"#
                 _ => "",
             };
             match app.is_empty() {
-                true => Err(format!("terminal não suportado: {other}")),
+                true => Err(format!("unsupported terminal: {other}")),
                 false => Ok(format!(r#"tell application "{app}" to activate"#)),
             }
         }
@@ -465,7 +465,7 @@ end tell"#
 const FALLBACK_TERM_PROGRAM: &str = "WarpTerminal";
 
 fn session_focus_script(session_id: &str) -> Result<String, String> {
-    let v = read_session_file(session_id).ok_or("sessão não encontrada")?;
+    let v = read_session_file(session_id).ok_or("session not found")?;
     let tty = sanitize_tty(v.get("tty").and_then(|x| x.as_str()).unwrap_or(""));
     let term = v.get("term_program").and_then(|x| x.as_str()).unwrap_or("");
     focus_script(term, &tty).or_else(|_| focus_script(FALLBACK_TERM_PROGRAM, &tty))
@@ -499,7 +499,7 @@ fn ensure_accessibility() -> Result<(), String> {
     let _ = Command::new("open")
         .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
         .spawn();
-    Err("Ative o claude-notch em Ajustes → Privacidade e Segurança → Acessibilidade e tente de novo.".into())
+    Err("Enable claude-notch in System Settings → Privacy & Security → Accessibility and try again.".into())
 }
 
 fn run_osascript(script: &str) -> Result<(), String> {
@@ -529,7 +529,7 @@ fn focus_session(session_id: String) -> Result<(), String> {
 #[tauri::command]
 fn respond_session(session_id: String, approve: bool) -> Result<(), String> {
     if session_provider(&session_id) != "claude" {
-        return Err("resposta por teclado disponível apenas para Claude Code".into());
+        return Err("keystroke reply is only available for Claude Code".into());
     }
     let focus = session_focus_script(&session_id)?;
     let key = match approve {
@@ -601,7 +601,7 @@ fn is_awaiting_permission(session_id: &str) -> bool {
 #[tauri::command]
 fn send_text(session_id: String, text: String) -> Result<(), String> {
     if session_provider(&session_id) == "cursor" {
-        return Err("envio de texto indisponível para sessões do Cursor".into());
+        return Err("sending text is unavailable for Cursor sessions".into());
     }
     let clean: String = text.replace(['\n', '\r'], " ");
     if clean.trim().is_empty() {
@@ -686,7 +686,7 @@ fn set_settings(
     let shortcut: Shortcut = settings
         .shortcut
         .parse()
-        .map_err(|_| "atalho inválido (ex.: cmd+alt+c)".to_string())?;
+        .map_err(|_| "invalid shortcut (e.g. cmd+alt+c)".to_string())?;
     let shortcuts = app.global_shortcut();
     let _ = shortcuts.unregister_all();
     shortcuts.register(shortcut).map_err(|e| e.to_string())?;
@@ -736,7 +736,7 @@ fn oauth_token() -> Result<String, String> {
         .output()
         .map_err(|e| e.to_string())?;
     if !output.status.success() {
-        return Err("credenciais do Claude Code não encontradas no Keychain".into());
+        return Err("Claude Code credentials not found in Keychain".into());
     }
     let creds: serde_json::Value =
         serde_json::from_str(String::from_utf8_lossy(&output.stdout).trim())
@@ -766,7 +766,7 @@ fn fetch_plan_usage() -> Result<serde_json::Value, String> {
         .output()
         .map_err(|e| e.to_string())?;
     let body: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .map_err(|_| "resposta inválida do endpoint de uso".to_string())?;
+        .map_err(|_| "invalid response from usage endpoint".to_string())?;
     match body.get("limits").map(serde_json::Value::is_array) {
         Some(true) => Ok(body),
         _ => Err("endpoint de uso sem dados de limites".to_string()),
@@ -855,11 +855,11 @@ fn notify_new_waiting(app: &tauri::AppHandle, sessions: &[Session], previous: &H
             .into_iter()
             .find(|s| !s.is_empty())
             .cloned()
-            .unwrap_or_else(|| "Aguardando você".to_string());
+            .unwrap_or_else(|| "Waiting for you".to_string());
         let _ = app
             .notification()
             .builder()
-            .title(format!("{} aguardando", session.project))
+            .title(format!("{} waiting", session.project))
             .body(body)
             .show();
     }

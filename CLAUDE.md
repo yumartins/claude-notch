@@ -5,7 +5,7 @@ waiting for you. Rust backend polls `~/.claude/status/*.json`; React popover UI.
 
 ## Language
 
-Everything in **English** — code, comments, docs, commit messages, variable names, **file names, and component names**. This includes section components, illustrations, and any other files in the codebase. User-facing UI copy stays in pt-BR.
+Everything in **English** — code, comments, docs, commit messages, variable names, **file names, and component names**. This includes section components, illustrations, and any other files in the codebase. User-facing UI copy is in English too.
 
 ## Code Style
 

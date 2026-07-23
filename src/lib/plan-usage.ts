@@ -34,17 +34,17 @@ interface LimitLabelParams {
 }
 
 const KIND_LABELS: Record<string, string> = {
-	session: "Sessão atual · 5 h",
-	weekly_all: "Semana · todos os modelos",
+	session: "Current session · 5 h",
+	weekly_all: "Week · all models",
 };
 
-const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MINUTE_MS = 60_000;
 const DAY_MINUTES = 24 * 60;
 
 function limitLabel({ limit }: LimitLabelParams): string {
 	const model = limit.scope?.model?.display_name;
-	if (model) return `Semana · ${model}`;
+	if (model) return `Week · ${model}`;
 	return KIND_LABELS[limit.kind] ?? limit.kind;
 }
 
@@ -55,18 +55,18 @@ export function formatResetText({
 	const reset = Date.parse(resetsAt);
 	if (Number.isNaN(reset) || reset <= now) return "";
 
-	const clock = new Date(reset).toLocaleTimeString("pt-BR", {
+	const clock = new Date(reset).toLocaleTimeString("en-GB", {
 		hour: "2-digit",
 		minute: "2-digit",
 	});
 	const minutes = Math.round((reset - now) / MINUTE_MS);
 	if (minutes >= DAY_MINUTES)
-		return `Reinicia ${WEEKDAYS[new Date(reset).getDay()]} ${clock}`;
+		return `Resets ${WEEKDAYS[new Date(reset).getDay()]} ${clock}`;
 
 	const hours = Math.floor(minutes / 60);
 	const rest = minutes % 60;
-	const relative = hours > 0 ? `em ${hours} h ${rest} m` : `em ${rest} m`;
-	return `Reinicia ${clock} · ${relative}`;
+	const relative = hours > 0 ? `in ${hours} h ${rest} m` : `in ${rest} m`;
+	return `Resets ${clock} · ${relative}`;
 }
 
 export function buildMeters({ usage, now }: BuildMetersParams): PlanMeter[] {

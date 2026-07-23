@@ -8,7 +8,7 @@ interface TranscriptPreviewProps {
 }
 
 const ROLE_LABELS: Record<TranscriptRole, string> = {
-	[TranscriptRole.User]: "Você",
+	[TranscriptRole.User]: "You",
 	[TranscriptRole.Assistant]: "Claude",
 };
 

@@ -58,8 +58,8 @@ function ThemeToggle({ theme, onTheme }: ThemeToggleProps) {
 
 	return (
 		<div className="flex items-center gap-px rounded-full border bg-secondary p-0.5">
-			{segment(Theme.Light, Sun, "Tema claro")}
-			{segment(Theme.Dark, Moon, "Tema escuro")}
+			{segment(Theme.Light, Sun, "Light theme")}
+			{segment(Theme.Dark, Moon, "Dark theme")}
 		</div>
 	);
 }
@@ -87,10 +87,10 @@ function EmptyState() {
 			</span>
 			<span className="flex flex-col items-center gap-0.5">
 				<span className="font-medium text-foreground/80 text-xs">
-					Tudo tranquilo por aqui
+					All quiet here
 				</span>
 				<span className="text-muted-foreground text-xs">
-					O Clawd avisa quando alguma sessão precisar de você
+					Clawd will let you know when a session needs you
 				</span>
 			</span>
 		</div>
@@ -108,7 +108,7 @@ export default function App() {
 	const [sheet, setSheet] = useState<Sheet | null>(null);
 
 	const totalLabel =
-		sessions.length === 1 ? "1 sessão" : `${sessions.length} sessões`;
+		sessions.length === 1 ? "1 session" : `${sessions.length} sessions`;
 
 	const closeSheet = () => setSheet(null);
 
@@ -150,17 +150,17 @@ export default function App() {
 				<div className="flex flex-none gap-1.5 px-3.5 pb-2.5">
 					<StatusBadge
 						count={counts.waiting}
-						label="aguardando"
+						label="waiting"
 						className="bg-status-waiting/15 text-status-waiting"
 					/>
 					<StatusBadge
 						count={counts.running}
-						label="rodando"
+						label="running"
 						className="bg-status-running/15 text-status-running"
 					/>
 					<StatusBadge
 						count={counts.idle}
-						label="ociosa"
+						label="idle"
 						className="bg-secondary text-muted-foreground"
 					/>
 				</div>
@@ -189,14 +189,13 @@ export default function App() {
 			)}
 
 			<div className="h-px flex-none bg-border" />
-			<footer className="flex flex-none items-center justify-between px-3.5 py-2.5">
+			<footer className="flex flex-none items-center justify-between px-2 py-1">
 				<Button
-					size="xs"
+					size="sm"
 					variant="ghost-primary"
-					className="gap-1.5 text-sm"
 					onClick={() => setSheet(Sheet.Picker)}
 				>
-					<span className="text-base leading-none">+</span> Nova sessão
+					+ New session
 				</Button>
 				<span className="flex items-center gap-1">
 					<Button
@@ -204,17 +203,17 @@ export default function App() {
 						variant="ghost-muted"
 						onClick={() => setSheet(Sheet.Metrics)}
 					>
-						Métricas
+						Metrics
 					</Button>
 					<Button
 						size="sm"
 						variant="ghost-muted"
 						onClick={() => setSheet(Sheet.Settings)}
 					>
-						Ajustes
+						Settings
 					</Button>
 					<Button size="sm" variant="ghost-muted" onClick={quitApp}>
-						Sair
+						Quit
 					</Button>
 				</span>
 			</footer>

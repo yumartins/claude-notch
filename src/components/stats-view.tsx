@@ -20,13 +20,13 @@ enum MetricsTab {
 }
 
 const TAB_LABELS: Record<MetricsTab, string> = {
-	[MetricsTab.Usage]: "Uso do plano",
-	[MetricsTab.Cost]: "Custo",
+	[MetricsTab.Usage]: "Plan usage",
+	[MetricsTab.Cost]: "Cost",
 };
 
 const WINDOW_DAYS = 7;
 const TOP_PROJECTS = 5;
-const WEEKDAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
 const MODEL_BAR_CLASSES: Record<string, string> = {
 	Sonnet: "bg-status-waiting",
@@ -118,12 +118,12 @@ function PlanUsageTab() {
 
 	if (usage === undefined)
 		return (
-			<p className="px-3.5 py-3 text-muted-foreground text-xs">Calculando…</p>
+			<p className="px-3.5 py-3 text-muted-foreground text-xs">Calculating…</p>
 		);
 	if (usage === null)
 		return (
 			<p className="px-3.5 py-3 text-muted-foreground text-xs">
-				Uso do plano indisponível — faça login no Claude Code
+				Plan usage unavailable — sign in to Claude Code
 			</p>
 		);
 
@@ -134,9 +134,9 @@ function PlanUsageTab() {
 				<Meter key={meter.label} meter={meter} />
 			))}
 			<p className="border-t pt-3 text-muted-foreground/70 text-xs leading-relaxed">
-				Espelha o{" "}
-				<span className="font-mono text-muted-foreground">/usage</span> do
-				Claude Code. Limites usam janela deslizante e reiniciam sozinhos.
+				Mirrors Claude Code's{" "}
+				<span className="font-mono text-muted-foreground">/usage</span>. Limits
+				use a sliding window and reset on their own.
 			</p>
 		</div>
 	);
@@ -172,22 +172,22 @@ function CostTab() {
 		: 0.01;
 
 	return summary === null ? (
-		<p className="px-3.5 py-3 text-muted-foreground text-xs">Calculando…</p>
+		<p className="px-3.5 py-3 text-muted-foreground text-xs">Calculating…</p>
 	) : (
 		<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3.5 py-3.5">
 			<div className="flex gap-2">
 				<StatCard
-					label="Hoje"
+					label="Today"
 					value={formatUsd({ value: summary.todayCostUsd })}
 				/>
 				<StatCard
-					label="7 dias"
+					label="7 days"
 					value={formatUsd({ value: summary.totalCostUsd })}
 				/>
 			</div>
 
 			<div>
-				<SectionLabel>Custo por dia</SectionLabel>
+				<SectionLabel>Cost per day</SectionLabel>
 				<div className="flex h-20 items-end gap-1.5">
 					{days.map((stat) => (
 						<div
@@ -203,7 +203,7 @@ function CostTab() {
 										: "text-muted-foreground/70",
 								)}
 							>
-								{stat.costUsd.toFixed(1).replace(".", ",")}
+								{stat.costUsd.toFixed(1)}
 							</span>
 							<div
 								className={cn(
@@ -230,7 +230,7 @@ function CostTab() {
 			</div>
 
 			<div>
-				<SectionLabel>Por projeto</SectionLabel>
+				<SectionLabel>By project</SectionLabel>
 				<div className="space-y-2.5">
 					{summary.projects.slice(0, TOP_PROJECTS).map((project) => (
 						<div key={project.project}>
@@ -262,14 +262,14 @@ function CostTab() {
 						</div>
 					))}
 					{summary.projects.length === 0 ? (
-						<p className="text-muted-foreground text-xs">Sem uso registrado</p>
+						<p className="text-muted-foreground text-xs">No usage recorded</p>
 					) : null}
 				</div>
 			</div>
 
 			{summary.models.length > 0 ? (
 				<div>
-					<SectionLabel>Por modelo</SectionLabel>
+					<SectionLabel>By model</SectionLabel>
 					<div className="flex h-2 gap-px overflow-hidden rounded-full">
 						{summary.models.map((model) => (
 							<div
@@ -304,7 +304,7 @@ function CostTab() {
 			) : null}
 
 			<p className="text-muted-foreground/70 text-xs">
-				Estimativa por preço de API, sem descontos de plano
+				Estimated at API pricing, without plan discounts
 			</p>
 		</div>
 	);

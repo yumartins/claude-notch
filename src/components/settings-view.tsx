@@ -32,7 +32,7 @@ const MIN_STALE_HOURS = 0.5;
 const MAX_STALE_HOURS = 24;
 
 function formatHours({ hours }: { hours: number }): string {
-	return `${String(hours).replace(".", ",")} h`;
+	return `${hours} h`;
 }
 
 function Section({ label, hint, children }: SectionProps) {
@@ -80,7 +80,7 @@ export function SettingsView({
 
 	return (
 		<SheetPanel
-			title={<span className="font-semibold text-sm">Ajustes</span>}
+			title={<span className="font-semibold text-sm">Settings</span>}
 			action={
 				<Button size="xs" variant="ghost-primary" onClick={onClose}>
 					OK
@@ -88,35 +88,33 @@ export function SettingsView({
 			}
 		>
 			<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3.5 py-3.5">
-				<Section label="Aparência">
+				<Section label="Appearance">
 					<div className="flex gap-1.5">
 						<Button
-							size="sm"
 							variant={theme === Theme.Light ? "default" : "secondary"}
 							className="flex-1"
 							onClick={() => onTheme({ theme: Theme.Light })}
 						>
-							☀ Claro
+							☀ Light
 						</Button>
 						<Button
-							size="sm"
 							variant={theme === Theme.Dark ? "default" : "secondary"}
 							className="flex-1"
 							onClick={() => onTheme({ theme: Theme.Dark })}
 						>
-							☾ Escuro
+							☾ Dark
 						</Button>
 					</div>
 				</Section>
 
-				<Section label="Atalho de abrir">
+				<Section label="Open shortcut">
 					<Button
 						variant="field"
 						className={cn(recording && "border-primary")}
 						onClick={() => setRecording(!recording)}
 					>
 						<span className="text-muted-foreground text-xs">
-							{recording ? "Pressione as teclas…" : "Clique para gravar"}
+							{recording ? "Press the keys…" : "Click to record"}
 						</span>
 						<span className="font-mono font-semibold text-primary text-sm">
 							{recording
@@ -127,13 +125,13 @@ export function SettingsView({
 				</Section>
 
 				<Section
-					label="Integrações"
-					hint="Instala hooks na configuração de cada agente; valem para novas sessões"
+					label="Integrations"
+					hint="Installs hooks in each agent's configuration; applies to new sessions"
 				>
 					<IntegrationsSection />
 				</Section>
 
-				<Section label="Terminal padrão">
+				<Section label="Default terminal">
 					<div className="flex flex-wrap gap-1.5">
 						{TERMINALS.map((terminal) => (
 							<Button
@@ -154,9 +152,9 @@ export function SettingsView({
 
 				<div className="flex items-center justify-between gap-3">
 					<div>
-						<p className="font-semibold text-sm">Notificações</p>
+						<p className="font-semibold text-sm">Notifications</p>
 						<p className="mt-0.5 text-muted-foreground text-xs">
-							Avisar quando uma sessão começa a aguardar
+							Notify when a session starts waiting
 						</p>
 					</div>
 					<Switch
@@ -169,9 +167,9 @@ export function SettingsView({
 
 				<div className="flex items-center justify-between gap-3">
 					<div>
-						<p className="font-semibold text-sm">Ocultar inativas após</p>
+						<p className="font-semibold text-sm">Hide inactive after</p>
 						<p className="mt-0.5 text-muted-foreground text-xs">
-							Sessões paradas somem da lista
+							Stalled sessions disappear from the list
 						</p>
 					</div>
 					<div className="flex flex-none items-center overflow-hidden rounded-lg border bg-secondary/50">

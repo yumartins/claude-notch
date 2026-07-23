@@ -8,9 +8,9 @@ interface ToggleParams {
 }
 
 const PROVIDER_HINTS: Record<Provider, string> = {
-	[Provider.Claude]: "Sessões e aprovação de permissões no terminal",
-	[Provider.Codex]: "Sessões do Codex CLI (requer codex_hooks ativo)",
-	[Provider.Cursor]: "Sessões e aprovação de comandos do agente",
+	[Provider.Claude]: "Sessions and permission approval in the terminal",
+	[Provider.Codex]: "Codex CLI sessions (requires codex_hooks enabled)",
+	[Provider.Cursor]: "Sessions and agent command approval",
 };
 
 export function IntegrationsSection() {
@@ -62,7 +62,7 @@ export function IntegrationsSection() {
 						disabled={busy === provider}
 						onClick={() => toggle({ provider })}
 					>
-						{installed[provider] ? "Remover" : "Instalar"}
+						{installed[provider] ? "Remove" : "Install"}
 					</Button>
 				</div>
 			))}

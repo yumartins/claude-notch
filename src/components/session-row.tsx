@@ -109,7 +109,7 @@ function ReplyBox({ sessionId }: ReplyBoxProps) {
 					value={text}
 					disabled={sending}
 					rows={2}
-					placeholder="Enviar mensagem para Claude…"
+					placeholder="Send a message to Claude…"
 					className="min-h-24 pr-11"
 					onChange={(event) => setText(event.target.value)}
 					onKeyDown={(event) => {
@@ -120,7 +120,7 @@ function ReplyBox({ sessionId }: ReplyBoxProps) {
 				/>
 				<Button
 					size="icon-sm"
-					title="Enviar para o terminal"
+					title="Send to terminal"
 					disabled={sending || !text.trim()}
 					className="absolute right-2 bottom-2.5"
 					onClick={submit}
@@ -179,7 +179,7 @@ function PermissionCard({ session, onError }: PermissionCardProps) {
 						respond({ sessionId: session.session_id, approve: true })
 					}
 				>
-					Aprovar <span className="font-mono opacity-60">↩</span>
+					Approve <span className="font-mono opacity-60">↩</span>
 				</Button>
 				<Button
 					variant="secondary"
@@ -188,7 +188,7 @@ function PermissionCard({ session, onError }: PermissionCardProps) {
 						respond({ sessionId: session.session_id, approve: false })
 					}
 				>
-					Negar <span className="font-mono opacity-50">esc</span>
+					Deny <span className="font-mono opacity-50">esc</span>
 				</Button>
 			</div>
 			{rule && session.cwd ? (
@@ -199,7 +199,7 @@ function PermissionCard({ session, onError }: PermissionCardProps) {
 					className="w-full"
 					onClick={alwaysAllow}
 				>
-					Sempre permitir
+					Always allow
 				</Button>
 			) : null}
 		</div>
@@ -217,9 +217,9 @@ interface ResolveParams {
 }
 
 const PASSTHROUGH_LABELS: Record<Provider, string> = {
-	[Provider.Claude]: "Responder no terminal",
-	[Provider.Codex]: "Responder no terminal",
-	[Provider.Cursor]: "Responder no Cursor",
+	[Provider.Claude]: "Answer in terminal",
+	[Provider.Codex]: "Answer in terminal",
+	[Provider.Cursor]: "Answer in Cursor",
 };
 
 // Approval card for requests arriving over the app socket: the agent hook is
@@ -268,14 +268,14 @@ function SocketPermissionCard({
 					className="flex-1 rounded-md font-semibold"
 					onClick={() => resolve({ decision: PermissionDecision.Allow })}
 				>
-					Aprovar
+					Approve
 				</Button>
 				<Button
 					variant="secondary"
 					className="flex-1 rounded-md font-semibold"
 					onClick={() => resolve({ decision: PermissionDecision.Deny })}
 				>
-					Negar
+					Deny
 				</Button>
 			</div>
 			<Button
@@ -294,7 +294,7 @@ function SocketPermissionCard({
 					className="w-full"
 					onClick={alwaysAllow}
 				>
-					Sempre permitir
+					Always allow
 				</Button>
 			) : null}
 		</div>
@@ -304,16 +304,14 @@ function SocketPermissionCard({
 function LimitCard({ message, onShowUsage }: LimitCardProps) {
 	return (
 		<div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5">
-			<p className="font-bold text-destructive text-sm">
-				Limite de uso atingido
-			</p>
+			<p className="font-bold text-destructive text-sm">Usage limit reached</p>
 			{message ? (
 				<p className="mt-1 font-mono text-muted-foreground text-xs leading-relaxed">
 					{message}
 				</p>
 			) : null}
 			<Button size="sm" className="mt-2 font-semibold" onClick={onShowUsage}>
-				Ver uso do plano
+				View plan usage
 			</Button>
 		</div>
 	);
@@ -344,7 +342,7 @@ export function SessionRow({
 		session.context_tokens > 0
 			? `${formatTokens({ count: session.context_tokens })} ctx`
 			: "",
-		duration ? `${duration} de sessão` : "",
+		duration ? `${duration} session` : "",
 		getTerminalLabel({ session }),
 	]
 		.filter(Boolean)
@@ -369,7 +367,7 @@ export function SessionRow({
 					<span className="flex items-baseline justify-between gap-2">
 						<span className="flex min-w-0 items-baseline gap-1.5">
 							<span className="truncate font-semibold text-base text-foreground tracking-tight">
-								{session.project || "sem-nome"}
+								{session.project || "unnamed"}
 							</span>
 							{provider !== Provider.Claude ? (
 								<span className="flex-none rounded-sm bg-secondary px-1.5 font-medium text-muted-foreground text-xs">
@@ -433,7 +431,7 @@ export function SessionRow({
 					className="w-full"
 					onClick={() => focusSession({ sessionId: session.session_id })}
 				>
-					Focar terminal →
+					Focus terminal →
 				</Button>
 				<p
 					className="truncate text-center font-mono text-muted-foreground/70 text-xs"

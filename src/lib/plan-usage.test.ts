@@ -21,7 +21,7 @@ function buildLimit(overrides: Partial<PlanLimit>): PlanLimit {
 }
 
 describe("buildMeters", () => {
-	test("maps limits to pt-BR labels and percentages", () => {
+	test("maps limits to labels and percentages", () => {
 		const limits = [
 			buildLimit({ kind: "session", percent: 53 }),
 			buildLimit({
@@ -38,9 +38,9 @@ describe("buildMeters", () => {
 		];
 		const meters = buildMeters({ usage: { limits }, now: NOW });
 		expect(meters.map((m) => m.label)).toEqual([
-			"Sessão atual · 5 h",
-			"Semana · todos os modelos",
-			"Semana · Fable",
+			"Current session · 5 h",
+			"Week · all models",
+			"Week · Fable",
 		]);
 		expect(meters.map((m) => m.percent)).toEqual([53, 49, 43]);
 	});
@@ -60,19 +60,17 @@ describe("formatResetText", () => {
 			resetsAt: iso(2 * HOUR + 41 * MINUTE),
 			now: NOW,
 		});
-		expect(text).toMatch(/^Reinicia \d{2}:\d{2} · em 2 h 41 m$/);
+		expect(text).toMatch(/^Resets \d{2}:\d{2} · in 2 h 41 m$/);
 	});
 
 	test("under an hour shows minutes only", () => {
 		const text = formatResetText({ resetsAt: iso(30 * MINUTE), now: NOW });
-		expect(text).toMatch(/^Reinicia \d{2}:\d{2} · em 30 m$/);
+		expect(text).toMatch(/^Resets \d{2}:\d{2} · in 30 m$/);
 	});
 
 	test("over a day shows the weekday", () => {
 		const text = formatResetText({ resetsAt: iso(72 * HOUR), now: NOW });
-		expect(text).toMatch(
-			/^Reinicia (dom|seg|ter|qua|qui|sex|sáb) \d{2}:\d{2}$/,
-		);
+		expect(text).toMatch(/^Resets (Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d{2}:\d{2}$/);
 	});
 
 	test("empty for past or invalid timestamps", () => {

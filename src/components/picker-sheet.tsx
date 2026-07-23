@@ -37,7 +37,7 @@ export function PickerSheet({ onClose }: PickerSheetProps) {
 
 	return (
 		<SheetPanel
-			title={<span className="font-semibold text-sm">Iniciar Claude em…</span>}
+			title={<span className="font-semibold text-sm">Start Claude in…</span>}
 		>
 			<ScrollArea className="min-h-0 flex-1">
 				<div className="p-1.5">
@@ -62,7 +62,7 @@ export function PickerSheet({ onClose }: PickerSheetProps) {
 					>
 						<FolderOpen className="size-3.5 flex-none text-muted-foreground" />
 						<span className="text-muted-foreground text-sm">
-							Escolher pasta…
+							Choose folder…
 						</span>
 					</Button>
 				</div>
@@ -70,7 +70,7 @@ export function PickerSheet({ onClose }: PickerSheetProps) {
 			<div className="h-px flex-none bg-border" />
 			<div className="flex flex-none justify-end px-3 py-2">
 				<Button size="xs" variant="ghost" onClick={onClose}>
-					Cancelar
+					Cancel
 				</Button>
 			</div>
 		</SheetPanel>

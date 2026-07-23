@@ -168,7 +168,7 @@ fn load_json(path: &PathBuf) -> Value {
 }
 
 fn save_json(path: &PathBuf, root: &Value) -> Result<(), String> {
-    let parent = path.parent().ok_or("caminho de configuração inválido")?;
+    let parent = path.parent().ok_or("invalid configuration path")?;
     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     let text = serde_json::to_string_pretty(root).map_err(|e| e.to_string())?;
     fs::write(path, text).map_err(|e| e.to_string())
@@ -225,7 +225,7 @@ fn config_path(provider: &str) -> Result<PathBuf, String> {
 
 fn enable_codex_feature() -> Result<(), String> {
     let path = codex_config_path();
-    let parent = path.parent().ok_or("caminho de configuração inválido")?;
+    let parent = path.parent().ok_or("invalid configuration path")?;
     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     let current = fs::read_to_string(&path).unwrap_or_default();
     let updated = enable_codex_hooks_flag(&current);

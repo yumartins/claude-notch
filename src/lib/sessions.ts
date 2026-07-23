@@ -52,9 +52,9 @@ interface FormatRelativeTimeParams {
 }
 
 const STATUS_LABELS: Record<SessionStatus, string> = {
-	[SessionStatus.Waiting]: "Ocioso, aguardando você",
-	[SessionStatus.Running]: "Trabalhando…",
-	[SessionStatus.Idle]: "Sem pendências",
+	[SessionStatus.Waiting]: "Idle, waiting for you",
+	[SessionStatus.Running]: "Working…",
+	[SessionStatus.Idle]: "Nothing pending",
 };
 
 const KNOWN_STATUSES = new Set<string>(Object.values(SessionStatus));
@@ -85,7 +85,7 @@ export function getStatusLabel({ session }: SessionParams): string {
 		status === SessionStatus.Waiting &&
 		session.type === SessionKind.PermissionPrompt;
 
-	return isPermissionPrompt ? "Aguardando permissão" : STATUS_LABELS[status];
+	return isPermissionPrompt ? "Waiting for permission" : STATUS_LABELS[status];
 }
 
 export function hasUsageLimit({ session }: SessionParams): boolean {
@@ -107,7 +107,7 @@ export function getTerminalLabel({ session }: SessionParams): string {
 }
 
 export function getActivityLabel({ session }: SessionParams): string {
-	if (hasUsageLimit({ session })) return "Limite de uso atingido";
+	if (hasUsageLimit({ session })) return "Usage limit reached";
 	const isRunningTool =
 		getSessionStatus({ session }) === SessionStatus.Running &&
 		session.tool !== "";
@@ -122,7 +122,7 @@ export function formatRelativeTime({
 
 	const seconds = Math.max(0, Math.floor(now - timestamp));
 
-	if (seconds < 45) return "agora";
+	if (seconds < 45) return "now";
 	if (seconds < 3_600) return `${Math.round(seconds / 60)}min`;
 	if (seconds < 86_400) return `${Math.round(seconds / 3_600)}h`;
 
@@ -149,8 +149,7 @@ export function getFolderName({ path }: GetFolderNameParams): string {
 }
 
 function toCompactDecimal({ value }: { value: number }): string {
-	const rounded = Math.round(value * 10) / 10;
-	return String(rounded).replace(".", ",");
+	return String(Math.round(value * 10) / 10);
 }
 
 export function formatTokens({ count }: FormatTokensParams): string {
@@ -190,8 +189,8 @@ function compareSessions(a: Session, b: Session): number {
 
 export function getSummary({ sessions }: SessionsParams): string {
 	const waiting = countWaiting({ sessions });
-	if (waiting > 0) return `${waiting} aguardando`;
+	if (waiting > 0) return `${waiting} waiting`;
 	if (sessions.length === 0) return "";
-	const noun = sessions.length === 1 ? "sessão" : "sessões";
+	const noun = sessions.length === 1 ? "session" : "sessions";
 	return `${sessions.length} ${noun}`;
 }
